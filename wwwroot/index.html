@@ -3,118 +3,201 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Universal Controller Viewport</title>
+    <title>Thio Universal Agent</title>
     <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
             background-color: #121212;
-            color: #ffffff;
+            color: #e0e0e0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            height: 100vh;
-            padding: 20px;
-            box-sizing: border-box;
         }
 
-        h2 {
-            margin-top: 0;
-            margin-bottom: 15px;
+        /* ---- Header ---- */
+        header {
+            padding: 28px 40px 20px;
+            border-bottom: 1px solid #222;
+        }
+
+        header h1 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #ffffff;
+            letter-spacing: 0.3px;
+        }
+
+        header p {
+            margin-top: 6px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        /* ---- Status bar ---- */
+        #status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 40px;
+            background-color: #161616;
+            border-bottom: 1px solid #1e1e1e;
+            font-size: 12px;
+            color: #555;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background-color: #33aa66;
+            flex-shrink: 0;
+        }
+
+        /* ---- Main ---- */
+        main {
+            flex: 1;
+            padding: 36px 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 36px;
+        }
+
+        section h2 {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: #555;
+            margin-bottom: 14px;
+        }
+
+        /* ---- Cards ---- */
+        .card-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+        }
+
+        .card {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 18px 22px;
+            background-color: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            text-decoration: none;
+            color: inherit;
+            width: 220px;
+            transition: border-color 0.15s, background-color 0.15s;
+        }
+
+        .card:hover {
+            background-color: #1f1f1f;
+            border-color: #4a9eff;
+        }
+
+        .card-icon { font-size: 20px; }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
             color: #e0e0e0;
         }
 
-        #toolbar {
-            margin-bottom: 15px;
+        .card-desc {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.5;
         }
 
-        button {
-            background-color: #2d2d2d;
-            color: #ffffff;
-            border: 1px solid #404040;
-            padding: 8px 16px;
-            cursor: pointer;
-            border-radius: 4px;
-            font-size: 14px;
+        .card-tag {
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #4a9eff;
+            background-color: #0d2540;
+            border: 1px solid #1a3a5c;
+            border-radius: 3px;
+            padding: 2px 6px;
+            width: fit-content;
         }
 
-            button:hover {
-                background-color: #3d3d3d;
-            }
-
-        #canvasContainer {
-            flex-grow: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            overflow: hidden;
-            background-color: #000000;
-            border: 1px solid #333333;
-            border-radius: 4px;
+        .card.placeholder {
+            opacity: 0.35;
+            pointer-events: none;
+            border-style: dashed;
         }
 
-        canvas {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
+        .card.placeholder .card-tag {
+            color: #555;
+            background-color: transparent;
+            border-color: #333;
         }
     </style>
 </head>
 <body>
-    <h2>Agent Viewport</h2>
-    <div id="toolbar">
-        <button id="captureBtn">Manual Capture</button>
+
+    <header>
+        <h1>Thio Universal Agent</h1>
+        <p>Autonomous cross-platform AI agent — host-native execution</p>
+    </header>
+
+    <div id="status-bar">
+        <span class="status-dot"></span>
+        <span>Server online</span>
     </div>
 
-    <div id="canvasContainer">
-        <canvas id="screenCanvas"></canvas>
-    </div>
+    <main>
 
-    <script>
-        const canvas = document.getElementById('screenCanvas');
-        const ctx = canvas.getContext('2d');
-        const captureBtn = document.getElementById('captureBtn');
+        <section>
+            <h2>Testing</h2>
+            <div class="card-grid">
 
-        async function fetchScreenshot() {
-            try {
-                // Append a timestamp query to bypass browser caching
-                const response = await fetch('/api/screenshot?t=' + new Date().getTime());
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
+                <a class="card" href="/Testing/Screenshot.html">
+                    <span class="card-icon">🖥️</span>
+                    <span class="card-title">Screenshot</span>
+                    <span class="card-desc">Verify screen capture via <code>IScreenProvider</code>.</span>
+                    <span class="card-tag">Test</span>
+                </a>
 
-                const blob = await response.blob();
-                const img = new Image();
-                const url = URL.createObjectURL(blob);
+                <a class="card" href="/Testing/Test_Chat.html">
+                    <span class="card-icon">💬</span>
+                    <span class="card-title">Chat</span>
+                    <span class="card-desc">Send prompts to the configured AI provider.</span>
+                    <span class="card-tag">Test</span>
+                </a>
 
-                img.onload = () => {
-                    // Resize canvas to match the native screen resolution
-                    canvas.width = img.width;
-                    canvas.height = img.height;
+            </div>
+        </section>
 
-                    // Draw the image onto the canvas
-                    ctx.drawImage(img, 0, 0);
+        <section>
+            <h2>Agent</h2>
+            <div class="card-grid">
 
-                    // Clean up memory
-                    URL.revokeObjectURL(url);
-                };
+                <div class="card placeholder">
+                    <span class="card-icon">🤖</span>
+                    <span class="card-title">Agent Loop</span>
+                    <span class="card-desc">Start and monitor the autonomous agent loop.</span>
+                    <span class="card-tag">Coming soon</span>
+                </div>
 
-                img.src = url;
-            } catch (error) {
-                console.error('Failed to load screenshot:', error);
-                ctx.fillStyle = '#121212';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#ff5555';
-                ctx.font = '20px sans-serif';
-                ctx.fillText('Connection lost. Is the agent server running?', 20, 40);
-            }
-        }
+                <div class="card placeholder">
+                    <span class="card-icon">🧠</span>
+                    <span class="card-title">Memory</span>
+                    <span class="card-desc">Browse the long-term knowledge base.</span>
+                    <span class="card-tag">Coming soon</span>
+                </div>
 
-        captureBtn.addEventListener('click', fetchScreenshot);
+            </div>
+        </section>
 
-        // Initial capture on load
-        fetchScreenshot();
-    </script>
+    </main>
+
 </body>
 </html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screenshot Test — Thio Agent</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 10px 20px;
+            background-color: #1a1a1a;
+            border-bottom: 1px solid #333;
+            flex-shrink: 0;
+        }
+
+        header h1 { font-size: 16px; font-weight: 600; color: #e0e0e0; }
+
+        nav { display: flex; gap: 16px; margin-left: auto; }
+        nav a { font-size: 13px; color: #4a9eff; text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
+
+        #toolbar {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 8px 20px;
+            background-color: #161616;
+            border-bottom: 1px solid #2a2a2a;
+            flex-shrink: 0;
+        }
+
+        button {
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+            border: 1px solid #404040;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: background-color 0.15s;
+        }
+
+        button:hover:not(:disabled) { background-color: #3d3d3d; }
+        button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        #status { font-size: 12px; color: #666; }
+        #status.ok    { color: #55cc88; }
+        #status.error { color: #ff7070; }
+
+        #imageContainer {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            background-color: #0a0a0a;
+        }
+
+        #placeholder {
+            color: #444;
+            font-size: 14px;
+            align-self: center;
+        }
+
+        #screenshot {
+            display: none;
+            max-width: 100%;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🧪 Screenshot Test</h1>
+        <nav>
+            <a href="/Testing/Test_Chat.html">Chat Test</a>
+            <a href="/">← Viewport</a>
+        </nav>
+    </header>
+
+    <div id="toolbar">
+        <button id="captureBtn">Capture Screenshot</button>
+        <span id="status">Ready.</span>
+    </div>
+
+    <div id="imageContainer">
+        <p id="placeholder">Click "Capture Screenshot" to see the result.</p>
+        <img id="screenshot" alt="Captured screenshot" />
+    </div>
+
+    <script>
+        const captureBtn    = document.getElementById('captureBtn');
+        const statusEl      = document.getElementById('status');
+        const screenshotImg = document.getElementById('screenshot');
+        const placeholder   = document.getElementById('placeholder');
+
+        async function capture() {
+            captureBtn.disabled = true;
+            statusEl.className  = '';
+            statusEl.textContent = 'Capturing…';
+
+            try {
+                const response = await fetch('/api/test/screenshot');
+
+                if (!response.ok) {
+                    const body = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${body}`);
+                }
+
+                const blob = await response.blob();
+                const url  = URL.createObjectURL(blob);
+
+                if (screenshotImg.src) URL.revokeObjectURL(screenshotImg.src);
+                screenshotImg.onload = () => URL.revokeObjectURL(url);
+                screenshotImg.src = url;
+                screenshotImg.style.display = 'block';
+                placeholder.style.display   = 'none';
+
+                statusEl.className   = 'ok';
+                statusEl.textContent = `Captured at ${new Date().toLocaleTimeString()}`;
+            } catch (err) {
+                statusEl.className   = 'error';
+                statusEl.textContent = err.message;
+            } finally {
+                captureBtn.disabled = false;
+            }
+        }
+
+        captureBtn.addEventListener('click', capture);
+    </script>
+
+</body>
+</html>
