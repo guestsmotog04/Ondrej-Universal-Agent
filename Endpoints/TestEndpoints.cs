@@ -58,7 +58,22 @@ internal static class TestEndpoints
                     // Key override path: lets the test page use any key without touching appsettings.json.
                     var model = string.IsNullOrWhiteSpace(req.Model) ? config["Gemini:Model"] ?? "gemini-2.0-flash" : req.Model;
                     var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={req.ApiKey}";
-                    var body = new { contents = new[] { new { parts = new[] { new { text = req.Prompt } } } } };
+                    object body = string.IsNullOrWhiteSpace(req.ImageBase64)
+                        ? new { contents = new[] { new { parts = new[] { new { text = req.Prompt } } } } }
+                        : (object)new
+                          {
+                              contents = new[]
+                              {
+                                  new
+                                  {
+                                      parts = new object[]
+                                      {
+                                          new { text = req.Prompt },
+                                          new { inlineData = new { mimeType = req.ImageMimeType ?? "image/jpeg", data = req.ImageBase64 } }
+                                      }
+                                  }
+                              }
+                          };
 
                     using var client = httpClientFactory.CreateClient();
                     using var httpResponse = await client.PostAsJsonAsync(url, body, ct);
@@ -78,7 +93,13 @@ internal static class TestEndpoints
                     return Results.Ok(new { text });
                 }
 
-                var result = await aiProvider.SendPromptAsync(req.Prompt, ct);
+                AiResponse result = string.IsNullOrWhiteSpace(req.ImageBase64)
+                    ? await aiProvider.SendPromptAsync(req.Prompt, ct)
+                    : await aiProvider.SendPromptWithImageAsync(
+                        req.Prompt,
+                        Convert.FromBase64String(req.ImageBase64),
+                        req.ImageMimeType ?? "image/jpeg",
+                        ct);
                 return result.Success
                     ? Results.Ok(new { result.Text })
                     : Results.Problem(result.ErrorMessage);
@@ -92,4 +113,4 @@ internal static class TestEndpoints
 }
 
 // Scoped to this file — it's a transport detail for the test endpoint, not a domain type.
-file record TestChatRequest(string Prompt, string? ApiKey, string? Model);
+file record TestChatRequest(string Prompt, string? ApiKey, string? Model, string? ImageBase64, string? ImageMimeType);
