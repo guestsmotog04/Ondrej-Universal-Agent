@@ -305,6 +305,8 @@
         const imgThumbnail  = document.getElementById('img-thumbnail');
         const removeImgBtn  = document.getElementById('removeImgBtn');
 
+        let currentConversationId = null;
+
         // Restore config from localStorage so it survives page refreshes.
         apiKeyInput.value = localStorage.getItem('test_apiKey') || '';
         modelInput.value  = localStorage.getItem('test_model')  || 'gemini-2.0-flash';
@@ -430,10 +432,11 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt,
-                        apiKey:        apiKeyInput.value.trim() || null,
-                        model:         modelInput.value.trim()  || null,
-                        imageBase64:   imageSnapshot?.base64    ?? null,
-                        imageMimeType: imageSnapshot?.mimeType  ?? null
+                        apiKey:         apiKeyInput.value.trim() || null,
+                        model:          modelInput.value.trim()  || null,
+                        imageBase64:    imageSnapshot?.base64    ?? null,
+                        imageMimeType:  imageSnapshot?.mimeType  ?? null,
+                        conversationId: currentConversationId
                     })
                 });
 
@@ -446,6 +449,14 @@
                 }
 
                 const data = await response.json();
+
+                if (data.conversationId && !currentConversationId) {
+                    currentConversationId = data.conversationId;
+                    appendSystem('\uD83D\uDD17 Conversation started — the AI will remember previous messages.');
+                } else if (data.conversationId) {
+                    currentConversationId = data.conversationId;
+                }
+
                 appendBubble('ai', data.text ?? data.Text ?? '(empty response)');
 
             } catch (err) {
@@ -472,7 +483,11 @@
             promptInput.style.height = Math.min(promptInput.scrollHeight, 160) + 'px';
         });
 
-        clearBtn.addEventListener('click', () => {
+        clearBtn.addEventListener('click', async () => {
+            if (currentConversationId) {
+                try { await fetch(`/api/test/chat/${currentConversationId}`, { method: 'DELETE' }); } catch { /* best-effort */ }
+                currentConversationId = null;
+            }
             messagesEl.innerHTML = '';
             clearAttachedImage();
             appendSystem('Chat cleared.');

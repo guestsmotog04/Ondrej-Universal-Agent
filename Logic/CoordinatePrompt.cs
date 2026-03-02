@@ -20,7 +20,7 @@ public class CoordinatePrompter
     /// <summary>Builds the prompt text that asks the LLM to identify grid coordinates.</summary>
     public static string MakeCoordinatePrompt(string itemToIdentify, int divisions = DefaultDivisions)
     {
-        return $"Identify the X and Y grid coordinates closest to: {itemToIdentify}. "
+        return $"Identify the X and Y grid coordinates closest to: {itemToIdentify}.\n\n"
              + $"Only output the result as plain text comma separated. Each coordinate should be between 0 and {divisions}, and contain a single decimal.";
     }
 

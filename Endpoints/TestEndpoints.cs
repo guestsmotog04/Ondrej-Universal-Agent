@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Thio_Universal_Agent;
@@ -21,6 +22,8 @@ internal static class TestEndpoints
     }
 
     private static readonly string TestingDisabledErrorMsg = "Testing endpoints are disabled. To enable, set Globals.ENABLE_TESTING to true.";
+
+    private static readonly ConcurrentDictionary<string, TestConversationSession> _conversations = new();
 
     internal static void MapTestEndpoints(this WebApplication app)
     {
@@ -53,30 +56,45 @@ internal static class TestEndpoints
 
             try
             {
+                bool hasImage = !string.IsNullOrWhiteSpace(req.ImageBase64);
+                bool hasPrompt = !string.IsNullOrWhiteSpace(req.Prompt);
+                bool isNewConversation = string.IsNullOrWhiteSpace(req.ConversationId);
+
                 if (!string.IsNullOrWhiteSpace(req.ApiKey))
                 {
                     // Key override path: lets the test page use any key without touching appsettings.json.
                     var model = string.IsNullOrWhiteSpace(req.Model) ? config["Gemini:Model"] ?? "gemini-2.0-flash" : req.Model;
                     var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={req.ApiKey}";
-                    object body = string.IsNullOrWhiteSpace(req.ImageBase64)
-                        ? new { contents = new[] { new { parts = new[] { new { text = req.Prompt } } } } }
-                        : (object)new
-                          {
-                              contents = new[]
-                              {
-                                  new
-                                  {
-                                      parts = new object[]
-                                      {
-                                          new { text = req.Prompt },
-                                          new { inlineData = new { mimeType = req.ImageMimeType ?? "image/jpeg", data = req.ImageBase64 } }
-                                      }
-                                  }
-                              }
-                          };
+
+                    var userParts = new List<object>();
+                    if (hasPrompt)
+                        userParts.Add(new { text = req.Prompt });
+                    if (hasImage)
+                        userParts.Add(new { inlineData = new { mimeType = req.ImageMimeType ?? "image/jpeg", data = req.ImageBase64 } });
+
+                    string conversationId;
+                    TestConversationSession session;
+                    if (isNewConversation)
+                    {
+                        conversationId = Guid.NewGuid().ToString("N");
+                        session = new TestConversationSession(IsApiKeyMode: true);
+                        _conversations[conversationId] = session;
+                    }
+                    else
+                    {
+                        conversationId = req.ConversationId!;
+                        if (!_conversations.TryGetValue(conversationId, out var found))
+                            return Results.Problem("Conversation not found or expired. Please clear and start a new conversation.");
+                        if (!found.IsApiKeyMode)
+                            return Results.Problem("Cannot switch from server-key mode to API-key override mid-conversation. Please clear and start a new conversation.");
+                        session = found;
+                    }
+
+                    var newUserTurn = new { role = "user", parts = userParts.ToArray() };
+                    var contents = new List<object>(session.RawHistory) { newUserTurn };
 
                     using var client = httpClientFactory.CreateClient();
-                    using var httpResponse = await client.PostAsJsonAsync(url, body, ct);
+                    using var httpResponse = await client.PostAsJsonAsync(url, new { contents }, ct);
                     var raw = await httpResponse.Content.ReadAsStringAsync(ct);
 
                     if (!httpResponse.IsSuccessStatusCode)
@@ -90,27 +108,84 @@ internal static class TestEndpoints
                         .GetProperty("text")
                         .GetString() ?? string.Empty;
 
-                    return Results.Ok(new { text });
+                    session.RawHistory.Add(newUserTurn);
+                    session.RawHistory.Add(new { role = "model", parts = new[] { new { text } } });
+
+                    return Results.Ok(new { text, conversationId });
                 }
 
-                AiResponse result = string.IsNullOrWhiteSpace(req.ImageBase64)
-                    ? await aiProvider.SendPromptAsync(req.Prompt, ct)
-                    : await aiProvider.SendPromptWithImageAsync(
-                        req.Prompt,
-                        Convert.FromBase64String(req.ImageBase64),
-                        req.ImageMimeType ?? "image/jpeg",
-                        ct);
-                return result.Success
-                    ? Results.Ok(new { result.Text })
-                    : Results.Problem(result.ErrorMessage);
+                // IAiProvider path
+                if (isNewConversation)
+                {
+                    // StartConversationAsync is text-only; first messages with an image are sent as a one-shot.
+                    if (hasImage)
+                    {
+                        if (!hasPrompt)
+                            return Results.Problem("Please include text with your first image message.");
+
+                        var result = await aiProvider.SendPromptWithImageAsync(
+                            req.Prompt!, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/jpeg", ct);
+                        return result.Success
+                            ? Results.Ok(new { result.Text, conversationId = (string?)null })
+                            : Results.Problem(result.ErrorMessage);
+                    }
+
+                    if (!hasPrompt)
+                        return Results.Problem("Prompt is required to start a conversation.");
+
+                    var (conversation, response) = await aiProvider.StartConversationAsync(req.Prompt!, ct);
+                    if (!response.Success)
+                        return Results.Problem(response.ErrorMessage);
+
+                    var newId = Guid.NewGuid().ToString("N");
+                    _conversations[newId] = new TestConversationSession(IsApiKeyMode: false) { Conversation = conversation };
+                    return Results.Ok(new { response.Text, conversationId = newId });
+                }
+                else
+                {
+                    if (!_conversations.TryGetValue(req.ConversationId!, out var session))
+                        return Results.Problem("Conversation not found or expired. Please clear and start a new conversation.");
+                    if (session.IsApiKeyMode)
+                        return Results.Problem("Cannot switch from API-key override mode to server-key mode mid-conversation. Please clear and start a new conversation.");
+                    if (session.Conversation == null)
+                        return Results.Problem("Invalid conversation state. Please clear and start a new conversation.");
+
+                    AiResponse response;
+                    if (hasImage && hasPrompt)
+                        response = await aiProvider.ContinueConversationAsync(
+                            session.Conversation, req.Prompt!, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/jpeg", ct);
+                    else if (hasImage)
+                        response = await aiProvider.ContinueConversationAsync(
+                            session.Conversation, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/jpeg", ct);
+                    else
+                        response = await aiProvider.ContinueConversationAsync(session.Conversation, req.Prompt!, ct);
+
+                    return response.Success
+                        ? Results.Ok(new { response.Text, conversationId = req.ConversationId })
+                        : Results.Problem(response.ErrorMessage);
+                }
             }
             catch (Exception ex)
             {
                 return Results.Problem(ex.Message);
             }
         });
+
+        // Discards the server-side conversation so the next message starts fresh.
+        group.MapDelete("/chat/{conversationId}", (string conversationId) =>
+        {
+            _conversations.TryRemove(conversationId, out _);
+            return Results.NoContent();
+        });
+    }
+
+    private sealed class TestConversationSession(bool IsApiKeyMode)
+    {
+        public bool IsApiKeyMode { get; } = IsApiKeyMode;
+        public AiConversation? Conversation { get; set; }
+        public List<object> RawHistory { get; } = [];
     }
 }
 
 // Scoped to this file — it's a transport detail for the test endpoint, not a domain type.
-file record TestChatRequest(string Prompt, string? ApiKey, string? Model, string? ImageBase64, string? ImageMimeType);
+file record TestChatRequest(string? Prompt, string? ApiKey, string? Model, string? ImageBase64, string? ImageMimeType, string? ConversationId);
