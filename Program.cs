@@ -29,6 +29,9 @@ else
 
 builder.Services.AddHttpClient<IAiProvider, GeminiProvider>();
 builder.Services.AddTransient<CoordinatePrompter>();
+builder.Services.AddTransient<AgentActionExecutor>();
+builder.Services.AddTransient<AgentLoop>();
+builder.Services.AddSingleton<AgentSessionManager>();
 
 var app = builder.Build();
 
@@ -36,5 +39,6 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapTestEndpoints();
+app.MapAgentEndpoints();
 
 app.Run();

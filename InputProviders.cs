@@ -21,6 +21,7 @@ namespace Thio_Universal_Agent
 
         // Methods that use coordinates relative to the entire screen as opposed to within an individual window
         Task LeftClick_MonitorCoords(int x, int y);
+        Task DoubleClick_MonitorCoords(int x, int y);
         Task RightClick_MonitorCoords(int x, int y);
         Task MiddleMouse_MonitorCoords(int x, int y);
         Task MoveMouse_MonitorCoords(int x, int y);

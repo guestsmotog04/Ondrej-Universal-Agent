@@ -434,6 +434,13 @@ namespace Thio_Universal_Agent.OS_Windows
             await Task.CompletedTask;
         }
 
+        public async Task DoubleClick_MonitorCoords(int x, int y)
+        {
+            SetCursorPos(x, y);
+            SendMouseClick(MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, count: 2);
+            await Task.CompletedTask;
+        }
+
         public async Task RightClick_MonitorCoords(int x, int y)
         {
             SetCursorPos(x, y);
@@ -448,15 +455,18 @@ namespace Thio_Universal_Agent.OS_Windows
             await Task.CompletedTask;
         }
 
-        private static void SendMouseClick(uint downFlag, uint upFlag)
+        private static void SendMouseClick(uint downFlag, uint upFlag, int count = 1)
         {
-            INPUT[] inputs = new INPUT[2];
+            INPUT[] inputs = new INPUT[count * 2];
 
-            inputs[0].type = INPUT_MOUSE;
-            inputs[0].u.mi.dwFlags = downFlag;
-
-            inputs[1].type = INPUT_MOUSE;
-            inputs[1].u.mi.dwFlags = upFlag;
+            // Loop the count instead of hard coding just one up and down
+            for (int i = 0; i < count; i++)
+            {
+                inputs[i * 2].type = INPUT_MOUSE;
+                inputs[i * 2].u.mi.dwFlags = downFlag;
+                inputs[i * 2 + 1].type = INPUT_MOUSE;
+                inputs[i * 2 + 1].u.mi.dwFlags = upFlag;
+            }
 
             _ = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
         }

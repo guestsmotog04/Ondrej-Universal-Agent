@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Control — Thio Universal Agent</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 24px 32px 18px;
+            border-bottom: 1px solid #222;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        header a {
+            color: #4a9eff;
+            text-decoration: none;
+            font-size: 13px;
+        }
+
+        header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        /* ---- Controls ---- */
+        .controls {
+            padding: 20px 32px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            border-bottom: 1px solid #1e1e1e;
+        }
+
+        .controls input[type="text"] {
+            flex: 1;
+            padding: 10px 14px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #e0e0e0;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .controls input[type="text"]:focus {
+            border-color: #4a9eff;
+        }
+
+        .controls button {
+            padding: 10px 22px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        #btn-start {
+            background: #2c7a2c;
+            color: #fff;
+        }
+
+        #btn-start:hover { background: #349a34; }
+
+        #btn-start:disabled {
+            background: #1a3a1a;
+            color: #555;
+            cursor: default;
+        }
+
+        #btn-stop {
+            background: #8a2020;
+            color: #fff;
+        }
+
+        #btn-stop:hover { background: #a82828; }
+
+        #btn-stop:disabled {
+            background: #3a1a1a;
+            color: #555;
+            cursor: default;
+        }
+
+        /* ---- Status Bar ---- */
+        .status-bar {
+            padding: 10px 32px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: #161616;
+            border-bottom: 1px solid #1e1e1e;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-dot.idle { background: #555; }
+        .status-dot.running { background: #4a9eff; animation: pulse 1.2s infinite; }
+        .status-dot.completed { background: #33aa66; }
+        .status-dot.failed { background: #cc4444; }
+        .status-dot.cancelled { background: #aa8833; }
+        .status-dot.error { background: #cc4444; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        #status-text { font-weight: 600; }
+
+        /* ---- Main Layout ---- */
+        main {
+            flex: 1;
+            padding: 24px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            overflow: hidden;
+        }
+
+        /* ---- Current Step Card ---- */
+        .current-step {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            min-height: 90px;
+        }
+
+        .current-step h2 {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #555;
+            margin-bottom: 12px;
+        }
+
+        .current-step .thought {
+            color: #bbb;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .current-step .action {
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 13px;
+            color: #4a9eff;
+            background: #111;
+            padding: 6px 12px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .current-step .result {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #777;
+        }
+
+        /* ---- Step Log ---- */
+        .step-log-header {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .step-log {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #222;
+            border-radius: 6px;
+            background: #141414;
+        }
+
+        .step-entry {
+            padding: 12px 16px;
+            border-bottom: 1px solid #1c1c1c;
+            font-size: 13px;
+        }
+
+        .step-entry:last-child {
+            border-bottom: none;
+        }
+
+        .step-entry .step-num {
+            color: #555;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .step-entry .step-action {
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            color: #4a9eff;
+            font-size: 12px;
+        }
+
+        .step-entry .step-thought {
+            color: #888;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .step-entry .step-result {
+            color: #666;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
+        /* ---- Final Result Banner ---- */
+        .final-result {
+            padding: 16px 20px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            display: none;
+        }
+
+        .final-result.completed {
+            background: #1a2e1a;
+            border: 1px solid #2c7a2c;
+            color: #55cc77;
+            display: block;
+        }
+
+        .final-result.failed, .final-result.error {
+            background: #2e1a1a;
+            border: 1px solid #8a2020;
+            color: #cc5555;
+            display: block;
+        }
+
+        .final-result.cancelled {
+            background: #2e2a1a;
+            border: 1px solid #8a7020;
+            color: #ccaa55;
+            display: block;
+        }
+
+        /* ---- Debug Panel ---- */
+        .debug-toggle {
+            margin-top: 8px;
+        }
+
+        .debug-toggle summary {
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #c084fc;
+            padding: 4px 0;
+            user-select: none;
+        }
+
+        .debug-toggle summary:hover { color: #d8b4fe; }
+
+        .debug-entries {
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .debug-entry {
+            background: #0d0d0d;
+            border: 1px solid #1f1f1f;
+            border-radius: 4px;
+            padding: 8px 12px;
+        }
+
+        .debug-entry-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #c084fc;
+            margin-bottom: 4px;
+        }
+
+        .debug-entry-text {
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 11px;
+            color: #aaa;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+
+        .debug-entry-img {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 4px;
+            border: 1px solid #222;
+            margin-top: 4px;
+            cursor: pointer;
+        }
+
+        .debug-entry-img.expanded {
+            max-height: none;
+            max-width: 100%;
+        }
+
+        .debug-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 600;
+            color: #c084fc;
+            background: #1a0d2e;
+            border: 1px solid #2d1a4e;
+            border-radius: 3px;
+            padding: 1px 6px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <a href="/">&larr; Home</a>
+    <h1>Agent Control</h1>
+</header>
+
+<div class="controls">
+    <input type="text" id="goal-input" placeholder="Enter a goal for the AI agent..." />
+    <button id="btn-start">Start</button>
+    <button id="btn-stop" disabled>Stop</button>
+</div>
+
+<div class="status-bar">
+    <div class="status-dot idle" id="status-dot"></div>
+    <span id="status-text">Idle</span>
+    <span id="step-counter"></span>
+</div>
+
+<main>
+    <div class="final-result" id="final-result"></div>
+
+    <div class="current-step" id="current-step">
+        <h2>Current Step</h2>
+        <div class="thought" id="current-thought">Waiting for agent to start...</div>
+        <div class="action" id="current-action" style="display:none;"></div>
+        <div class="result" id="current-result"></div>
+    </div>
+
+    <div class="step-log-header">Step History</div>
+    <div class="step-log" id="step-log"></div>
+</main>
+
+<script>
+    const goalInput = document.getElementById('goal-input');
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const stepCounter = document.getElementById('step-counter');
+    const finalResultEl = document.getElementById('final-result');
+    const currentThought = document.getElementById('current-thought');
+    const currentAction = document.getElementById('current-action');
+    const currentResult = document.getElementById('current-result');
+    const stepLog = document.getElementById('step-log');
+
+    let sessionId = null;
+    let eventSource = null;
+    let debugEnabled = false;
+
+    // Check debug flag on load
+    (async () => {
+        try {
+            const res = await fetch('/api/agent/debug-enabled');
+            if (res.ok) {
+                const data = await res.json();
+                debugEnabled = !!data.enabled;
+                if (debugEnabled) {
+                    document.getElementById('status-text').textContent = 'Idle (Debug Mode)';
+                }
+            }
+        } catch { /* non-critical */ }
+    })();
+
+    goalInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !btnStart.disabled) startAgent();
+    });
+
+    btnStart.addEventListener('click', startAgent);
+    btnStop.addEventListener('click', stopAgent);
+
+    async function startAgent() {
+        const goal = goalInput.value.trim();
+        if (!goal) return;
+
+        // Reset UI
+        stepLog.innerHTML = '';
+        finalResultEl.className = 'final-result';
+        finalResultEl.textContent = '';
+        finalResultEl.style.display = 'none';
+        currentThought.textContent = 'Starting...';
+        currentAction.style.display = 'none';
+        currentAction.textContent = '';
+        currentResult.textContent = '';
+        stepCounter.textContent = '';
+        setStatus('running', debugEnabled ? 'Running (Debug Mode)' : 'Running');
+
+        btnStart.disabled = true;
+        btnStop.disabled = false;
+        goalInput.disabled = true;
+
+        try {
+            const res = await fetch('/api/agent/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ goal }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                showFinalResult('error', err.error || 'Failed to start agent.');
+                resetControls();
+                return;
+            }
+
+            const data = await res.json();
+            sessionId = data.sessionId;
+
+            // Connect SSE
+            eventSource = new EventSource(`/api/agent/${sessionId}/stream`);
+            eventSource.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'step') handleStep(msg);
+                else if (msg.type === 'done') handleDone(msg);
+            };
+            eventSource.onerror = () => {
+                eventSource.close();
+                eventSource = null;
+                if (statusText.textContent.startsWith('Running')) {
+                    setStatus('error', 'Connection lost');
+                    resetControls();
+                }
+            };
+        } catch (err) {
+            showFinalResult('error', 'Network error: ' + err.message);
+            resetControls();
+        }
+    }
+
+    async function stopAgent() {
+        if (!sessionId) return;
+        btnStop.disabled = true;
+        try {
+            await fetch(`/api/agent/${sessionId}/stop`, { method: 'POST' });
+        } catch { /* best effort */ }
+    }
+
+    function handleStep(msg) {
+        stepCounter.textContent = `Step ${msg.stepNumber}`;
+
+        // Update current step card
+        currentThought.textContent = msg.thought;
+        currentAction.textContent = msg.action;
+        currentAction.style.display = 'inline-block';
+        currentResult.textContent = msg.result;
+
+        // Build step log entry
+        const entry = document.createElement('div');
+        entry.className = 'step-entry';
+
+        let html = `
+            <span class="step-num">#${msg.stepNumber}</span>
+            <span class="step-action">${escapeHtml(msg.action)}</span>
+            <div class="step-thought">${escapeHtml(msg.thought)}</div>
+            <div class="step-result">${escapeHtml(msg.result)}</div>
+        `;
+
+        // Debug panel
+        if (debugEnabled && msg.debugLog && msg.debugLog.length > 0) {
+            html += renderDebugLog(msg.debugLog);
+        }
+
+        entry.innerHTML = html;
+
+        // Bind click-to-expand for debug images
+        entry.querySelectorAll('.debug-entry-img').forEach(img => {
+            img.addEventListener('click', () => img.classList.toggle('expanded'));
+        });
+
+        stepLog.prepend(entry);
+
+        if (msg.isTerminal) {
+            const status = msg.goalAchieved ? 'completed' : 'failed';
+            setStatus(status, msg.goalAchieved ? 'Completed' : 'Failed');
+            showFinalResult(status, msg.result);
+            cleanup();
+        }
+    }
+
+    function renderDebugLog(entries) {
+        let html = `<details class="debug-toggle"><summary>Debug Info <span class="debug-badge">${entries.length} entries</span></summary><div class="debug-entries">`;
+
+        for (const e of entries) {
+            html += `<div class="debug-entry">`;
+            html += `<div class="debug-entry-label">${escapeHtml(e.label)}</div>`;
+
+            if (e.text) {
+                html += `<div class="debug-entry-text">${escapeHtml(e.text)}</div>`;
+            }
+
+            if (e.imageBase64) {
+                html += `<img class="debug-entry-img" src="data:image/png;base64,${e.imageBase64}" alt="${escapeHtml(e.label)}" title="Click to expand" />`;
+            }
+
+            html += `</div>`;
+        }
+
+        html += `</div></details>`;
+        return html;
+    }
+
+    function handleDone(msg) {
+        const statusKey = msg.status.toLowerCase();
+        setStatus(statusKey, msg.status);
+        if (msg.finalResult) showFinalResult(statusKey, msg.finalResult);
+        cleanup();
+    }
+
+    function setStatus(key, label) {
+        statusDot.className = 'status-dot ' + key;
+        statusText.textContent = label;
+    }
+
+    function showFinalResult(statusKey, message) {
+        finalResultEl.className = 'final-result ' + statusKey;
+        finalResultEl.textContent = message;
+        finalResultEl.style.display = 'block';
+    }
+
+    function cleanup() {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+        resetControls();
+    }
+
+    function resetControls() {
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        goalInput.disabled = false;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+</script>
+
+</body>
+</html>
