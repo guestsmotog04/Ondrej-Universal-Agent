@@ -352,6 +352,7 @@
 </header>
 
 <div class="controls">
+    <input type="password" id="api-key-input" placeholder="Gemini API Key" style="flex:0 0 220px;" />
     <input type="text" id="goal-input" placeholder="Enter a goal for the AI agent..." />
     <button id="btn-start">Start</button>
     <button id="btn-stop" disabled>Stop</button>
@@ -378,6 +379,7 @@
 </main>
 
 <script>
+    const apiKeyInput = document.getElementById('api-key-input');
     const goalInput = document.getElementById('goal-input');
     const btnStart = document.getElementById('btn-start');
     const btnStop = document.getElementById('btn-stop');
@@ -393,6 +395,12 @@
     let sessionId = null;
     let eventSource = null;
     let debugEnabled = false;
+
+    // Restore API key from localStorage
+    apiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
+    apiKeyInput.addEventListener('input', () => {
+        localStorage.setItem('gemini_api_key', apiKeyInput.value);
+    });
 
     // Check debug flag on load
     (async () => {
@@ -419,6 +427,13 @@
         const goal = goalInput.value.trim();
         if (!goal) return;
 
+        const apiKey = apiKeyInput.value.trim();
+        if (!apiKey) {
+            showFinalResult('error', 'Please enter your Gemini API key.');
+            apiKeyInput.focus();
+            return;
+        }
+
         // Reset UI
         stepLog.innerHTML = '';
         finalResultEl.className = 'final-result';
@@ -439,7 +454,7 @@
             const res = await fetch('/api/agent/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ goal }),
+                body: JSON.stringify({ goal, apiKey }),
             });
 
             if (!res.ok) {

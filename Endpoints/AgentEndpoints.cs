@@ -21,10 +21,16 @@ internal static class AgentEndpoints
         group.MapGet("/debug-enabled", () => Results.Ok(new { enabled = Globals.ENABLE_TESTING }));
 
         // Start a new agent session
-        group.MapPost("/start", (AgentStartRequest req, AgentSessionManager manager) =>
+        group.MapPost("/start", (AgentStartRequest req, AgentSessionManager manager, IConfiguration configuration) =>
         {
             if (string.IsNullOrWhiteSpace(req.Goal))
                 return Results.BadRequest(new { error = "Goal is required." });
+
+            if (string.IsNullOrWhiteSpace(req.ApiKey))
+                return Results.BadRequest(new { error = "API key is required." });
+
+            // Store the key so the next GeminiProvider instance picks it up
+            configuration["Gemini:ApiKey"] = req.ApiKey;
 
             string sessionId = manager.StartSession(req.Goal);
             return Results.Ok(new { sessionId });
@@ -194,4 +200,4 @@ internal static class AgentEndpoints
     };
 }
 
-file record AgentStartRequest(string? Goal);
+file record AgentStartRequest(string? Goal, string? ApiKey);

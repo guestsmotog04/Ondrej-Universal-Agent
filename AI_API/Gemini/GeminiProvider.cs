@@ -30,7 +30,9 @@ public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configu
         PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
-    private readonly string _apiKey = configuration["Gemini:ApiKey"] ?? throw new InvalidOperationException("Gemini:ApiKey is not configured.");
+    private readonly string _apiKey = !string.IsNullOrWhiteSpace(configuration["Gemini:ApiKey"])
+        ? configuration["Gemini:ApiKey"]!
+        : throw new InvalidOperationException("Gemini:ApiKey is not configured. Provide an API key via the web UI.");
     private readonly string _model = configuration["Gemini:Model"] ?? "gemini-2.0-flash";
     private readonly GeminiGenerationConfig? _generationConfig = BuildGenerationConfig(configuration, configuration["Gemini:Model"] ?? "gemini-2.0-flash");
 
