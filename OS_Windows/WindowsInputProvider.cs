@@ -51,6 +51,52 @@ namespace Thio_Universal_Agent.OS_Windows
             {"LALT", (0x12, 56)},
         };
 
+        // Named key lookup: maps key names from the agent parser to VK codes and extended-key flag.
+        // Keys like "win", "enter", "tab" etc. can't be resolved by VkKeyScanW (which only handles typeable characters).
+        private static readonly Dictionary<string, (ushort vk, bool extended)> NamedKeys = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "win",         (0x5B, true) },   // VK_LWIN
+            { "lwin",        (0x5B, true) },
+            { "rwin",        (0x5C, true) },   // VK_RWIN
+            { "enter",       (0x0D, false) },  // VK_RETURN
+            { "return",      (0x0D, false) },
+            { "tab",         (0x09, false) },  // VK_TAB
+            { "escape",      (0x1B, false) },  // VK_ESCAPE
+            { "esc",         (0x1B, false) },
+            { "backspace",   (0x08, false) },  // VK_BACK
+            { "delete",      (0x2E, true) },   // VK_DELETE
+            { "del",         (0x2E, true) },
+            { "space",       (0x20, false) },  // VK_SPACE
+            { "up",          (0x26, true) },   // VK_UP
+            { "down",        (0x28, true) },   // VK_DOWN
+            { "left",        (0x25, true) },   // VK_LEFT
+            { "right",       (0x27, true) },   // VK_RIGHT
+            { "home",        (0x24, true) },   // VK_HOME
+            { "end",         (0x23, true) },   // VK_END
+            { "pageup",      (0x21, true) },   // VK_PRIOR
+            { "pgup",        (0x21, true) },
+            { "pagedown",    (0x22, true) },   // VK_NEXT
+            { "pgdn",        (0x22, true) },
+            { "insert",      (0x2D, true) },   // VK_INSERT
+            { "ins",         (0x2D, true) },
+            { "printscreen", (0x2C, false) },  // VK_SNAPSHOT
+            { "prtsc",       (0x2C, false) },
+            { "capslock",    (0x14, false) },  // VK_CAPITAL
+            { "numlock",     (0x90, true) },   // VK_NUMLOCK
+            { "f1",  (0x70, false) },
+            { "f2",  (0x71, false) },
+            { "f3",  (0x72, false) },
+            { "f4",  (0x73, false) },
+            { "f5",  (0x74, false) },
+            { "f6",  (0x75, false) },
+            { "f7",  (0x76, false) },
+            { "f8",  (0x77, false) },
+            { "f9",  (0x78, false) },
+            { "f10", (0x79, false) },
+            { "f11", (0x7A, false) },
+            { "f12", (0x7B, false) },
+        };
+
         // Flags for KEYBDINPUT structure used in API calls
         // Reference: https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-keybdinput
         const uint INPUT_KEYBOARD = 1;
@@ -157,17 +203,29 @@ namespace Thio_Universal_Agent.OS_Windows
 
         public async Task SendModKeyComboAsync(string key, bool? ctrl = null, bool? shift = null, bool? alt = null)
         {
-            TextCharCode keyChar = new TextCharCode(key);
+            ushort vk;
+            ushort scan;
+            bool extended;
 
-            // If shift state wasn't provided, default to the state from the key
-            if (shift == null)
-                shift = keyChar.shiftState;
+            // Try named keys first (win, enter, tab, f1, etc.) — TextCharCode only handles single typeable characters
+            if (NamedKeys.TryGetValue(key, out var named))
+            {
+                vk = named.vk;
+                scan = MapVirtualKey(vk, (uint)MapVirtualKeyType.MAPVK_VK_TO_VSC);
+                extended = named.extended;
+                shift ??= false;
+            }
+            else
+            {
+                TextCharCode keyChar = new TextCharCode(key);
+                vk = keyChar.vk;
+                scan = keyChar.scan;
+                extended = keyChar.extended;
+                shift ??= keyChar.shiftState;
+            }
 
-            if (ctrl == null)
-                ctrl = false;
-
-            if (alt == null)
-                alt = false;
+            ctrl ??= false;
+            alt ??= false;
 
             // Array to contain list of individual key up and down events in sequence
             List<INPUT> inputList = new();
@@ -181,8 +239,8 @@ namespace Thio_Universal_Agent.OS_Windows
                 inputList.Add(CreateInput(vk: modifierKeyCodes["LALT"].vk, scan: modifierKeyCodes["LALT"].scan, isKeyUp: false, extended: false));
 
             // Add main key down and up
-            inputList.Add(CreateInput(vk: keyChar.vk, scan: keyChar.scan, isKeyUp: false, extended: false));
-            inputList.Add(CreateInput(vk: keyChar.vk, scan: keyChar.scan, isKeyUp: true, extended: false));
+            inputList.Add(CreateInput(vk: vk, scan: scan, isKeyUp: false, extended: extended));
+            inputList.Add(CreateInput(vk: vk, scan: scan, isKeyUp: true, extended: extended));
 
             // Add modifier keys up
             if (ctrl == true)
@@ -191,6 +249,12 @@ namespace Thio_Universal_Agent.OS_Windows
                 inputList.Add(CreateInput(vk: modifierKeyCodes["LSHIFT"].vk, scan: modifierKeyCodes["LSHIFT"].scan, isKeyUp: true, extended: false));
             if (alt == true)
                 inputList.Add(CreateInput(vk: modifierKeyCodes["LALT"].vk, scan: modifierKeyCodes["LALT"].scan, isKeyUp: true, extended: false));
+
+            INPUT[] inputs = inputList.ToArray();
+            if (inputs.Length > 0)
+            {
+                _ = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
+            }
         }
 
         /// <summary>

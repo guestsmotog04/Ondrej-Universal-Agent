@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Thio_Universal_Agent.AI_API;
 
@@ -13,13 +14,17 @@ public sealed class AgentLoop(
     IAiProvider aiProvider,
     IScreenProvider screenProvider,
     AgentActionExecutor executor,
+    IConfiguration configuration,
     ILogger<AgentLoop> logger)
 {
     private const int MaxSteps = 50;
     private const int MaxParseRetries = 2;
-    private const int SettleDelayMs = 400;
+    private const int DefaultSettleDelayMs = 1500;
     private const int ContextResetInterval = 8;
     private const string ScreenMimeType = "image/jpeg";
+
+    private readonly int _settleDelayMs =
+        int.TryParse(configuration["Agent:SettleDelayMs"], out var d) && d > 0 ? d : DefaultSettleDelayMs;
 
     /// <summary>
     /// Runs the agent loop to completion for the given session.
@@ -131,7 +136,7 @@ public sealed class AgentLoop(
                 }
 
                 // Settle delay — let the UI update before next screenshot
-                await Task.Delay(SettleDelayMs, ct).ConfigureAwait(false);
+                await Task.Delay(_settleDelayMs, ct).ConfigureAwait(false);
 
                 // Observe: take a new screenshot
                 screenshot = screenProvider.CaptureScreen();

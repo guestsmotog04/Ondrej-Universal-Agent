@@ -205,6 +205,13 @@ public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configu
 
         var candidate = geminiResponse.Candidates[0];
 
+        if (candidate.Content?.Parts is not { Count: > 0 })
+        {
+            var reason = candidate.FinishReason ?? "Unknown";
+            logger.LogWarning("Gemini candidate has no content parts. FinishReason: {FinishReason}", reason);
+            return new AiResponse(false, string.Empty, $"Gemini returned an empty candidate (finish reason: {reason}).");
+        }
+
         var text = string.Concat(candidate.Content.Parts
             .Where(p => p.Text is not null && p.Thought is not true)
             .Select(p => p.Text!));
@@ -254,6 +261,6 @@ public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configu
     // --- Private response DTOs ---
 
     private record GeminiResponse(List<GeminiCandidate>? Candidates, GeminiPromptFeedback? PromptFeedback);
-    private record GeminiCandidate(GeminiContent Content, string FinishReason);
+    private record GeminiCandidate(GeminiContent? Content, string? FinishReason);
     private record GeminiPromptFeedback(string? BlockReason);
 }
