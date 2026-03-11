@@ -88,6 +88,10 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, IConfigur
         {
             return GetFromStrings([code]);
         }
+
+        // Allow the class type to be used as a string where it returns the Code property
+        public static implicit operator string(CoordResponseCode c) => c.Code;
+        public override string ToString() => Code;
     }
 
     /// <summary>Tracks a rectangular crop window in original image pixel coordinates.</summary>
