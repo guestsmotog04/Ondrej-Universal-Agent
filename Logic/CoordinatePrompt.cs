@@ -306,12 +306,12 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, IConfigur
     /// <summary>Builds the prompt text that asks the LLM to identify grid coordinates.</summary>
     private static string MakeCoordinatePrompt(string itemToIdentify, int divisions = DefaultDivisions)
     {
-        return $"Identify the X and Y grid coordinates closest to: {itemToIdentify}.\n\n"
-             + $"Possible Response Outputs: {CoordResponseCode.COORDS}, {CoordResponseCode.CANNOT_FIND}, {CoordResponseCode.UNSURE}"
-             + $"\nIf you can identify the item, output, output the result as {CoordResponseCode.COORDS} followed by a space then the plain text comma separated numbers. Each coordinate should be between 0 and {divisions}, and contain a single decimal."
-             + $"\n    Example:  {CoordResponseCode.COORDS} 3.2, 7.5"
-             + $"\n\nIf you cannot locate the described item at all, output only the special error code: {CoordResponseCode.CANNOT_FIND}"
-             + $"\nIf the described item is ambiguous or there are multiple items of equal likelihood, output only the special error code: {CoordResponseCode.UNSURE}";
+        return $"Return the X, Y grid coordinates closest to the item with the following description in the given screenshot: {itemToIdentify}.\n\n"
+             + $"\nIf you can identify the item, output, respond with {CoordResponseCode.COORDS} then the comma sparated X,Y coordinates. Each coordinate must be between 0 and {divisions}, and contain a single decimal."
+             + $"\n    Example Response:  \"{CoordResponseCode.COORDS} 3.2, 7.5\""
+             + $"\n\nALTERNATIVE RETURN CODES:"
+             + $"\n\nIf you cannot locate the described item at all, respond only with: {CoordResponseCode.CANNOT_FIND}"
+             + $"\nIf the described item is ambiguous or there are multiple items of equal likelihood, respond only with: {CoordResponseCode.UNSURE}";
     }
 
     /// <summary>Creates a <see cref="ViewRegion"/> covering the full source image.</summary>

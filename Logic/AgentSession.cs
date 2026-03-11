@@ -58,4 +58,15 @@ public sealed class AgentSession
         if (handler is not null)
             await handler(step).ConfigureAwait(false);
     }
+
+    private readonly TaskCompletionSource _terminated = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// Completes when the session has fully terminated (status and FinalResult are guaranteed to be set).
+    /// Resolved by <see cref="SignalTerminated"/> at the end of <see cref="AgentLoop.RunAsync"/>.
+    /// </summary>
+    public Task Terminated => _terminated.Task;
+
+    /// <summary>Called by <see cref="AgentLoop"/> once the loop exits to unblock any SSE stream waiters.</summary>
+    internal void SignalTerminated() => _terminated.TrySetResult();
 }

@@ -188,6 +188,11 @@ public sealed class AgentLoop(
             session.FinalResult = $"Unexpected error: {ex.Message}";
             logger.LogError(ex, "Unexpected error in session {SessionId}.", session.SessionId);
         }
+        finally
+        {
+            // Always signal termination so SSE stream waiters are unblocked regardless of how the loop exits.
+            session.SignalTerminated();
+        }
     }
 
     /// <summary>

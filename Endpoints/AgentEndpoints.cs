@@ -127,8 +127,9 @@ internal static class AgentEndpoints
                     return;
                 }
 
-                // Wait until a terminal step arrives or the client disconnects
+                // Wait until a terminal step arrives, the session ends for any reason, or the client disconnects
                 using CancellationTokenRegistration registration = ct.Register(() => tcs.TrySetResult());
+                _ = session.Terminated.ContinueWith(_ => tcs.TrySetResult(), TaskContinuationOptions.ExecuteSynchronously);
                 await tcs.Task.ConfigureAwait(false);
 
                 await TryWriteTerminalEventAsync(httpContext.Response, session, ct).ConfigureAwait(false);
