@@ -30,9 +30,10 @@ public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configu
         PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
-    private readonly string _apiKey = !string.IsNullOrWhiteSpace(configuration["Gemini:ApiKey"])
-        ? configuration["Gemini:ApiKey"]!
-        : throw new InvalidOperationException("Gemini:ApiKey is not configured. Provide an API key via the web UI.");
+    // Not validated here — the key may be absent at construction time and supplied later
+    // via the web UI (configuration["Gemini:ApiKey"] is set by the /api/agent/start endpoint).
+    // Validation is deferred to SendRequestAsync so that constructing this type never throws.
+    private readonly string? _apiKey = configuration["Gemini:ApiKey"] is { } k && !string.IsNullOrWhiteSpace(k) ? k : null;
     private readonly string _model = configuration["Gemini:Model"] ?? "gemini-2.0-flash";
     private readonly GeminiGenerationConfig? _generationConfig = BuildGenerationConfig(configuration, configuration["Gemini:Model"] ?? "gemini-2.0-flash");
 
@@ -171,13 +172,19 @@ public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configu
 
     private async Task<AiResponse> SendRequestAsync(GeminiRequest request, CancellationToken cancellationToken, AiRequestOptions? options = null)
     {
+        // Re-read from configuration at call time so a key set after construction
+        // (e.g. via the web UI /api/agent/start endpoint) is always picked up.
+        var apiKey = _apiKey ?? configuration["Gemini:ApiKey"];
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new InvalidOperationException("Gemini:ApiKey is not configured. Provide an API key via the web UI.");
+
         if (options?.MaxOutputTokens is not null)
         {
             var baseConfig = request.GenerationConfig ?? new GeminiGenerationConfig(null, null, null, null, null, null);
             request = request with { GenerationConfig = baseConfig with { MaxOutputTokens = options.MaxOutputTokens } };
         }
 
-        var url = $"{BaseUrl}/{_model}:generateContent?key={_apiKey}";
+        var url = $"{BaseUrl}/{_model}:generateContent?key={apiKey}";
 
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("Sending prompt to Gemini model {Model}.", _model);
