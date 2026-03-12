@@ -113,9 +113,20 @@ public sealed class AgentLoop(
                     "Step {Step}: THOUGHT: {Thought} | ACTION: {ActionKind} {ActionDetail}",
                     step, parsed.Thought, parsed.Action.Kind, FormatActionDetail(parsed.Action));
 
+                // Notify the UI immediately so it can show what the agent is about to do
+                // before potentially slow work (e.g. coordinate resolution) begins.
+                var preview = new AgentStepPreview(step, parsed.Thought, parsed.Action);
+                await session.RaiseStepStartingAsync(preview).ConfigureAwait(false);
+
+                // Create a progress callback that streams each executor debug entry to the UI in real-time
+                int currentStep = step;
+                Func<AgentDebugEntry, Task>? executorProgress = debugging
+                    ? async entry => await session.RaiseSubStepUpdateAsync(new AgentSubStep(currentStep, entry)).ConfigureAwait(false)
+                    : null;
+
                 // Execute the action (executor adds its own debug entries)
                 ActionExecutionResult result = await ExecuteWithTargetRecoveryAsync(
-                    parsed.Action, screenshot, conversation, ct, debugLog).ConfigureAwait(false);
+                    parsed.Action, screenshot, conversation, ct, debugLog, executorProgress).ConfigureAwait(false);
 
                 if (debugging)
                     debugLog!.Add(new AgentDebugEntry("Execution Result", Text: $"Success={result.Success} | {result.Summary}"));
@@ -241,10 +252,10 @@ public sealed class AgentLoop(
     /// </summary>
     private async Task<ActionExecutionResult> ExecuteWithTargetRecoveryAsync(
         AgentAction action, byte[] screenshot, AiConversation conversation, CancellationToken ct,
-        List<AgentDebugEntry>? debugLog = null)
+        List<AgentDebugEntry>? debugLog = null, Func<AgentDebugEntry, Task>? onProgress = null)
     {
         ActionExecutionResult result = await executor
-            .ExecuteAsync(action, screenshot, ct)
+            .ExecuteAsync(action, screenshot, ct, onProgress)
             .ConfigureAwait(false);
 
         // Merge executor's debug entries into our step log
@@ -257,10 +268,14 @@ public sealed class AgentLoop(
             logger.LogWarning("Target resolution failed for \"{Target}\": {Summary}", action.Target, result.Summary);
 
             string recovery = AgentPromptBuilder.BuildTargetNotFoundPrompt(action.Target);
-            debugLog?.Add(new AgentDebugEntry("Target Not Found — Recovery Prompt", Text: recovery));
+            var recoveryEntry = new AgentDebugEntry("Target Not Found — Recovery Prompt", Text: recovery);
+            debugLog?.Add(recoveryEntry);
+            if (onProgress is not null) await onProgress(recoveryEntry).ConfigureAwait(false);
 
             AiResponse recoveryResponse = await aiProvider.ContinueConversationAsync(conversation, recovery, ct).ConfigureAwait(false);
-            debugLog?.Add(new AgentDebugEntry("Target Not Found — AI Recovery Response", Text: recoveryResponse.Text));
+            var responseEntry = new AgentDebugEntry("Target Not Found — AI Recovery Response", Text: recoveryResponse.Text);
+            debugLog?.Add(responseEntry);
+            if (onProgress is not null) await onProgress(responseEntry).ConfigureAwait(false);
         }
 
         return result;

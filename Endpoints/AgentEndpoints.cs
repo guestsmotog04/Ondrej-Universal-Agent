@@ -101,6 +101,30 @@ internal static class AgentEndpoints
             // Subscribe to future steps
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
+            async Task OnSubStepUpdate(AgentSubStep subStep)
+            {
+                try
+                {
+                    await WriteSubStepEventAsync(httpContext.Response, subStep, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    tcs.TrySetResult();
+                }
+            }
+
+            async Task OnStepStarting(AgentStepPreview preview)
+            {
+                try
+                {
+                    await WriteStepStartingEventAsync(httpContext.Response, preview, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    tcs.TrySetResult();
+                }
+            }
+
             async Task OnStep(AgentStep step)
             {
                 try
@@ -116,6 +140,8 @@ internal static class AgentEndpoints
                 }
             }
 
+            session.OnSubStepUpdate += OnSubStepUpdate;
+            session.OnStepStarting += OnStepStarting;
             session.OnStepCompleted += OnStep;
 
             try
@@ -136,6 +162,8 @@ internal static class AgentEndpoints
             }
             finally
             {
+                session.OnSubStepUpdate -= OnSubStepUpdate;
+                session.OnStepStarting -= OnStepStarting;
                 session.OnStepCompleted -= OnStep;
             }
         });
@@ -146,6 +174,37 @@ internal static class AgentEndpoints
             bool found = manager.StopSession(sessionId);
             return found ? Results.NoContent() : Results.NotFound(new { error = "Session not found." });
         });
+    }
+
+    private static async Task WriteSubStepEventAsync(HttpResponse response, AgentSubStep subStep, CancellationToken ct)
+    {
+        var payload = new
+        {
+            type = "subStep",
+            subStep.StepNumber,
+            label = subStep.Entry.Label,
+            text = subStep.Entry.Text,
+            imageBase64 = subStep.Entry.ImageBase64,
+        };
+
+        string json = JsonSerializer.Serialize(payload, JsonOptions);
+        await response.WriteAsync($"data: {json}\n\n", ct).ConfigureAwait(false);
+        await response.Body.FlushAsync(ct).ConfigureAwait(false);
+    }
+
+    private static async Task WriteStepStartingEventAsync(HttpResponse response, AgentStepPreview preview, CancellationToken ct)
+    {
+        var payload = new
+        {
+            type = "stepStarting",
+            preview.StepNumber,
+            preview.Thought,
+            action = FormatAction(preview.Action),
+        };
+
+        string json = JsonSerializer.Serialize(payload, JsonOptions);
+        await response.WriteAsync($"data: {json}\n\n", ct).ConfigureAwait(false);
+        await response.Body.FlushAsync(ct).ConfigureAwait(false);
     }
 
     private static async Task WriteStepEventAsync(HttpResponse response, AgentStep step, CancellationToken ct)

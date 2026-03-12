@@ -93,6 +93,24 @@ public sealed record ActionExecutionResult(
     bool GoalAchieved,
     IReadOnlyList<AgentDebugEntry>? DebugEntries = null);
 
+/// <summary>
+/// Lightweight preview emitted right after the AI's response is parsed but before execution begins.
+/// Allows the UI to show the intended action while coordinate resolution or other slow work proceeds.
+/// </summary>
+/// <param name="StepNumber">1-based index of the upcoming step.</param>
+/// <param name="Thought">The AI's reasoning for this step.</param>
+/// <param name="Action">The tool invocation that is about to be executed.</param>
+public sealed record AgentStepPreview(int StepNumber, string Thought, AgentAction Action);
+
+/// <summary>
+/// A real-time sub-step update emitted during action execution.
+/// Streamed to the UI via SSE before the full step completes, providing visibility
+/// into slow operations like coordinate resolution.
+/// </summary>
+/// <param name="StepNumber">The 1-based step number this sub-step belongs to.</param>
+/// <param name="Entry">The debug entry being emitted.</param>
+public sealed record AgentSubStep(int StepNumber, AgentDebugEntry Entry);
+
 /// <summary>A single completed step in the agent's execution history.</summary>
 /// <param name="StepNumber">1-based index of this step.</param>
 /// <param name="Thought">The AI's reasoning for this step.</param>

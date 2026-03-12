@@ -47,6 +47,34 @@ public sealed class AgentSession
     public CancellationTokenSource Cts { get; } = new();
 
     /// <summary>
+    /// Event raised right after the AI's response is parsed but before the action is executed.
+    /// Allows the UI to show the intended action while coordinate resolution or other slow work proceeds.
+    /// </summary>
+    public event Func<AgentStepPreview, Task>? OnStepStarting;
+
+    /// <summary>Raises <see cref="OnStepStarting"/> for the given preview.</summary>
+    internal async Task RaiseStepStartingAsync(AgentStepPreview preview)
+    {
+        Func<AgentStepPreview, Task>? handler = OnStepStarting;
+        if (handler is not null)
+            await handler(preview).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Event raised in real-time during action execution for each intermediate debug entry.
+    /// Allows the UI to show coordinate resolution progress without waiting for the full step to complete.
+    /// </summary>
+    public event Func<AgentSubStep, Task>? OnSubStepUpdate;
+
+    /// <summary>Raises <see cref="OnSubStepUpdate"/> for the given sub-step.</summary>
+    internal async Task RaiseSubStepUpdateAsync(AgentSubStep subStep)
+    {
+        Func<AgentSubStep, Task>? handler = OnSubStepUpdate;
+        if (handler is not null)
+            await handler(subStep).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Event raised after each step completes. The <see cref="AgentEndpoints"/> SSE stream subscribes to this.
     /// </summary>
     public event Func<AgentStep, Task>? OnStepCompleted;

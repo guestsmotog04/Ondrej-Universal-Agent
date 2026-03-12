@@ -181,6 +181,29 @@
             color: #777;
         }
 
+        /* ---- Live Sub-Steps ---- */
+        .live-substeps {
+            margin-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .live-substeps:empty {
+            display: none;
+        }
+
+        .live-substep-header {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #c084fc;
+            margin-bottom: 4px;
+        }
+
         /* ---- Step Log ---- */
         .step-log-header {
             font-size: 11px;
@@ -401,6 +424,7 @@
         <div class="thought" id="current-thought">Waiting for agent to start...</div>
         <div class="action" id="current-action" style="display:none;"></div>
         <div class="result" id="current-result"></div>
+        <div class="live-substeps" id="live-substeps"></div>
     </div>
 
     <div class="step-log-header"><span>Step History</span><button id="btn-copy-steps" title="Copy all steps as JSON">Copy</button></div>
@@ -419,6 +443,7 @@
     const currentThought = document.getElementById('current-thought');
     const currentAction = document.getElementById('current-action');
     const currentResult = document.getElementById('current-result');
+    const liveSubsteps = document.getElementById('live-substeps');
     const stepLog = document.getElementById('step-log');
 
     let sessionId = null;
@@ -479,6 +504,7 @@
         currentAction.style.display = 'none';
         currentAction.textContent = '';
         currentResult.textContent = '';
+        liveSubsteps.innerHTML = '';
         stepCounter.textContent = '';
         setStatus('running', debugEnabled ? 'Running (Debug Mode)' : 'Running');
 
@@ -507,7 +533,9 @@
             eventSource = new EventSource(`/api/agent/${sessionId}/stream`);
             eventSource.onmessage = (e) => {
                 const msg = JSON.parse(e.data);
-                if (msg.type === 'step') handleStep(msg);
+                if (msg.type === 'stepStarting') handleStepStarting(msg);
+                else if (msg.type === 'subStep') handleSubStep(msg);
+                else if (msg.type === 'step') handleStep(msg);
                 else if (msg.type === 'done') handleDone(msg);
             };
             eventSource.onerror = () => {
@@ -532,9 +560,55 @@
         } catch { /* best effort */ }
     }
 
+    function handleStepStarting(msg) {
+        stepCounter.textContent = `Step ${msg.stepNumber}`;
+
+        // Update current step card immediately so the user can see
+        // what the agent decided before slow work (e.g. coordinate resolution) begins.
+        currentThought.textContent = msg.thought;
+        currentAction.textContent = msg.action;
+        currentAction.style.display = 'inline-block';
+        currentResult.textContent = 'Executing…';
+        liveSubsteps.innerHTML = '';
+    }
+
+    function handleSubStep(msg) {
+        if (!debugEnabled) return;
+
+        const entry = document.createElement('div');
+        entry.className = 'debug-entry';
+
+        let html = `<div class="debug-entry-label">${escapeHtml(msg.label)}</div>`;
+        if (msg.text) {
+            html += `<div class="debug-entry-text">${escapeHtml(msg.text)}</div>`;
+        }
+        if (msg.imageBase64) {
+            html += `<img class="debug-entry-img" src="data:image/png;base64,${msg.imageBase64}" alt="${escapeHtml(msg.label)}" title="Click to expand" />`;
+        }
+
+        entry.innerHTML = html;
+        entry.querySelectorAll('.debug-entry-img').forEach(img => {
+            img.addEventListener('click', () => img.classList.toggle('expanded'));
+        });
+
+        // Show a header if this is the first sub-step
+        if (liveSubsteps.children.length === 0) {
+            const header = document.createElement('div');
+            header.className = 'live-substep-header';
+            header.textContent = 'Live Progress';
+            liveSubsteps.appendChild(header);
+        }
+
+        liveSubsteps.appendChild(entry);
+        liveSubsteps.scrollTop = liveSubsteps.scrollHeight;
+    }
+
     function handleStep(msg) {
         stepsData.push(msg);
         stepCounter.textContent = `Step ${msg.stepNumber}`;
+
+        // Clear live sub-steps since the full step is now complete
+        liveSubsteps.innerHTML = '';
 
         // Update current step card
         currentThought.textContent = msg.thought;
