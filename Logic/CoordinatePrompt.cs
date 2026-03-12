@@ -20,8 +20,6 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, IConfigur
             ? new AiRequestOptions(MaxOutputTokens: maxTokens)
             : null;
 
-    private const int RulerOffset = 100;
-    private const int LabelBuffer = 60;
     private const int DefaultDivisions = 10;
     private const double DefaultConfidencePixels = 15.0;
     private const int MaxZoomIterations = 10;

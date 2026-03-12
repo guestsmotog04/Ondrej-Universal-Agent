@@ -32,6 +32,43 @@ public sealed partial class CoordinatePrompter
         return new SkiaImage(SKBitmap.Decode(imageBytes));
     }
 
+    /// <summary>Computes the label font size used for axis labels.</summary>
+    private static float ComputeLabelSize(int imageWidth)
+        => Math.Max(16f, imageWidth / 60f);
+
+    /// <summary>
+    /// Computes the ruler margin needed so that axis labels, tick marks, and gaps
+    /// all fit without clipping, for both axes.
+    /// </summary>
+    private static int ComputeRulerOffset(int imageWidth, int maxLabelValue)
+    {
+        float labelSize = ComputeLabelSize(imageWidth);
+        float textH = labelSize * 1.3f;
+        int maxDigits = maxLabelValue.ToString(CultureInfo.InvariantCulture).Length;
+        float maxTextW = labelSize * maxDigits * 0.75f;
+        float tickLen = Math.Max(8f, labelSize * 0.5f);
+        float gap = Math.Max(4f, labelSize * 0.25f);
+        float padding = Math.Max(4f, labelSize * 0.15f);
+
+        float verticalNeed = textH + tickLen + gap + padding;
+        float horizontalNeed = maxTextW + tickLen + gap + padding;
+        return (int)Math.Ceiling(Math.Max(verticalNeed, horizontalNeed));
+    }
+
+    /// <summary>
+    /// Computes the trailing buffer added after the image area so the last
+    /// axis labels are not clipped on the right or bottom edge.
+    /// </summary>
+    private static int ComputeLabelBuffer(int imageWidth, int maxLabelValue)
+    {
+        float labelSize = ComputeLabelSize(imageWidth);
+        float textH = labelSize * 1.3f;
+        int maxDigits = maxLabelValue.ToString(CultureInfo.InvariantCulture).Length;
+        float maxTextW = labelSize * maxDigits * 0.75f;
+        float padding = Math.Max(4f, labelSize * 0.25f);
+        return (int)Math.Ceiling(Math.Max(maxTextW, textH) / 2f + padding);
+    }
+
 
     /// <summary>Returns a copy of the grid image with a crosshair marker drawn at the parsed coordinate.</summary>
     private static byte[] CreateAnnotatedImage(
@@ -42,6 +79,8 @@ public sealed partial class CoordinatePrompter
         int cols = DefaultDivisions,
         int rows = DefaultDivisions)
     {
+        int rulerOffset = ComputeRulerOffset(imageWidth, Math.Max(cols, rows));
+
         using IImage gridImage = LoadImage(gridImageBytes);
         int w = (int)gridImage.Width;
         int h = (int)gridImage.Height;
@@ -53,8 +92,8 @@ public sealed partial class CoordinatePrompter
 
         float cellW = (float)imageWidth / cols;
         float cellH = (float)imageHeight / rows;
-        float cx = RulerOffset + (float)coordinate.X * cellW;
-        float cy = RulerOffset + (float)coordinate.Y * cellH;
+        float cx = rulerOffset + (float)coordinate.X * cellW;
+        float cy = rulerOffset + (float)coordinate.Y * cellH;
         float radius = Math.Max(10f, imageWidth / 150f);
         float crossLen = radius * 2.5f;
 
@@ -74,6 +113,7 @@ public sealed partial class CoordinatePrompter
     /// <summary>Draws the grid lines, axis labels and tick marks onto the canvas.</summary>
     private static void DrawRulerGrid(
         ICanvas canvas,
+        int rulerOffset,
         int imageWidth,
         int imageHeight,
         int cols,
@@ -82,7 +122,9 @@ public sealed partial class CoordinatePrompter
         float? lineThickness)
     {
         float thickness = lineThickness ?? Math.Max(1f, imageWidth / 1200f);
-        float labelSize = Math.Max(16f, imageWidth / 60f);
+        float labelSize = ComputeLabelSize(imageWidth);
+        float tickLen = Math.Max(8f, labelSize * 0.5f);
+        float labelGap = Math.Max(4f, labelSize * 0.25f);
 
         IFont labelFont = new Font("Consolas", FontWeights.Bold);
 
@@ -100,35 +142,35 @@ public sealed partial class CoordinatePrompter
         // Vertical lines + X axis labels
         for (int c = 0; c <= cols; c++)
         {
-            float x = RulerOffset + c * cellW;
+            float x = rulerOffset + c * cellW;
 
-            canvas.DrawLine(x, RulerOffset, x, RulerOffset + imageHeight);
+            canvas.DrawLine(x, rulerOffset, x, rulerOffset + imageHeight);
 
             string label = c.ToString(CultureInfo.InvariantCulture);
             float textW = labelSize * label.Length * 0.75f;
             float textH = labelSize * 1.3f;
             canvas.DrawString(label,
-                x - textW / 2, RulerOffset - 15 - textH, textW, textH,
+                x - textW / 2, rulerOffset - tickLen - labelGap - textH, textW, textH,
                 HorizontalAlignment.Center, VerticalAlignment.Center);
 
-            canvas.DrawLine(x, RulerOffset - 8, x, RulerOffset);
+            canvas.DrawLine(x, rulerOffset - tickLen, x, rulerOffset);
         }
 
         // Horizontal lines + Y axis labels
         for (int r = 0; r <= rows; r++)
         {
-            float y = RulerOffset + r * cellH;
+            float y = rulerOffset + r * cellH;
 
-            canvas.DrawLine(RulerOffset, y, RulerOffset + imageWidth, y);
+            canvas.DrawLine(rulerOffset, y, rulerOffset + imageWidth, y);
 
             string label = r.ToString(CultureInfo.InvariantCulture);
             float textW = labelSize * label.Length * 0.75f;
             float textH = labelSize * 1.3f;
             canvas.DrawString(label,
-                RulerOffset - 25 - textW, y - textH / 2, textW, textH,
+                rulerOffset - tickLen - labelGap - textW, y - textH / 2, textW, textH,
                 HorizontalAlignment.Right, VerticalAlignment.Center);
 
-            canvas.DrawLine(RulerOffset - 8, y, RulerOffset, y);
+            canvas.DrawLine(rulerOffset - tickLen, y, rulerOffset, y);
         }
     }
 
@@ -147,8 +189,11 @@ public sealed partial class CoordinatePrompter
         Color color = gridColor ?? Color.FromRgba(236, 72, 153, 102); // ~40% opacity pink
         int imageWidth = (int)source.Width;
         int imageHeight = (int)source.Height;
-        int canvasWidth = imageWidth + RulerOffset + LabelBuffer;
-        int canvasHeight = imageHeight + RulerOffset + LabelBuffer;
+        int maxLabelValue = Math.Max(cols, rows);
+        int rulerOffset = ComputeRulerOffset(imageWidth, maxLabelValue);
+        int labelBuffer = ComputeLabelBuffer(imageWidth, maxLabelValue);
+        int canvasWidth = imageWidth + rulerOffset + labelBuffer;
+        int canvasHeight = imageHeight + rulerOffset + labelBuffer;
 
         using var context = new SkiaBitmapExportContext(canvasWidth, canvasHeight, 1.0f);
         ICanvas canvas = context.Canvas;
@@ -159,14 +204,14 @@ public sealed partial class CoordinatePrompter
 
         // Draw the cropped view stretched to the full image area via clip + transform
         canvas.SaveState();
-        canvas.ClipRectangle(RulerOffset, RulerOffset, imageWidth, imageHeight);
-        canvas.Translate(RulerOffset, RulerOffset);
+        canvas.ClipRectangle(rulerOffset, rulerOffset, imageWidth, imageHeight);
+        canvas.Translate(rulerOffset, rulerOffset);
         canvas.Scale(imageWidth / (float)view.Width, imageHeight / (float)view.Height);
         canvas.Translate(-(float)view.X, -(float)view.Y);
         canvas.DrawImage(source, 0, 0, source.Width, source.Height);
         canvas.RestoreState();
 
-        DrawRulerGrid(canvas, imageWidth, imageHeight, cols, rows, color, lineThickness);
+        DrawRulerGrid(canvas, rulerOffset, imageWidth, imageHeight, cols, rows, color, lineThickness);
 
         using var ms = new MemoryStream();
         context.WriteToStream(ms);
