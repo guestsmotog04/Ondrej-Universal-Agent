@@ -24,6 +24,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, IConfigur
     private const double DefaultConfidencePixels = 15.0;
     private const int MaxZoomIterations = 10;
     private const double DefaultAIEstimatePrecision = 0.3; // Assume AI is accurate within ~0.3 of a grid cell
+    private const int MinZoomResolution = 1920; // Upscale zoomed grid images so the longer side is at least this many pixels
 
     private readonly int _divisions = DefaultDivisions;
 
@@ -202,7 +203,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, IConfigur
         for (int i = 0; i < MaxZoomIterations && ShouldContinueZooming(view, divisions, divisions); i++)
         {
             view = CalculateZoomRegion(view, coordinate, imageWidth, imageHeight, divisions, divisions);
-            byte[] zoomedImage = CreateGridOverlayImage(source, view);
+            byte[] zoomedImage = CreateGridOverlayImage(source, view, minResolution: MinZoomResolution);
 
             // Send just the zoomed image; the AI continues from the same conversation
             response = await aiProvider.ContinueConversationAsync(
@@ -229,8 +230,9 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, IConfigur
 
             if (onStepCompleted is not null)
             {
+                (int renderedW, int renderedH) = ComputeRenderedSize((int)view.Width, (int)view.Height, MinZoomResolution);
                 byte[] annotated = parsed is not null
-                    ? CreateAnnotatedImage(zoomedImage, parsed, (int)view.Width, (int)view.Height, divisions, divisions)
+                    ? CreateAnnotatedImage(zoomedImage, parsed, renderedW, renderedH, divisions, divisions)
                     : zoomedImage;
                 await onStepCompleted(new CoordinateStep(
                     stepNumber, zoomedImage, response.Text, parsed?.X, parsed?.Y, annotated))

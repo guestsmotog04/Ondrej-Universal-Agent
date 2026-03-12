@@ -37,6 +37,21 @@ public sealed partial class CoordinatePrompter
         => Math.Max(16f, imageWidth / 60f);
 
     /// <summary>
+    /// Computes rendered image area dimensions, scaling up proportionally
+    /// so the longer side meets <paramref name="minResolution"/> when it would
+    /// otherwise be smaller. Returns the original dimensions when already large enough.
+    /// </summary>
+    private static (int Width, int Height) ComputeRenderedSize(int viewWidth, int viewHeight, int minResolution)
+    {
+        int maxDim = Math.Max(viewWidth, viewHeight);
+        if (maxDim >= minResolution)
+            return (viewWidth, viewHeight);
+
+        double scale = (double)minResolution / maxDim;
+        return ((int)(viewWidth * scale), (int)(viewHeight * scale));
+    }
+
+    /// <summary>
     /// Computes the ruler margin needed so that axis labels, tick marks, and gaps
     /// all fit without clipping, for both axes.
     /// </summary>
@@ -184,11 +199,13 @@ public sealed partial class CoordinatePrompter
         int cols = DefaultDivisions,
         int rows = DefaultDivisions,
         Color? gridColor = null,
-        float? lineThickness = null)
+        float? lineThickness = null,
+        int minResolution = 0)
     {
         Color color = gridColor ?? Color.FromRgba(236, 72, 153, 102); // ~40% opacity pink
-        int imageWidth = (int)view.Width;
-        int imageHeight = (int)view.Height;
+        (int imageWidth, int imageHeight) = minResolution > 0
+            ? ComputeRenderedSize((int)view.Width, (int)view.Height, minResolution)
+            : ((int)view.Width, (int)view.Height);
         int maxLabelValue = Math.Max(cols, rows);
         int rulerOffset = ComputeRulerOffset(imageWidth, maxLabelValue);
         int labelBuffer = ComputeLabelBuffer(imageWidth, maxLabelValue);
