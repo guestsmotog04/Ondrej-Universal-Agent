@@ -13,6 +13,7 @@ if (OperatingSystem.IsWindows())
 {
     builder.Services.AddSingleton<IScreenProvider, WindowsScreenProvider>();
     builder.Services.AddSingleton<IInputProvider, WindowsInputProvider>();
+    builder.Services.AddSingleton<ISystemProvider, WindowsSystemProvider>();
 }
 else if (OperatingSystem.IsMacOS())
 {
@@ -34,6 +35,8 @@ builder.Services.AddTransient<AgentLoop>();
 builder.Services.AddSingleton<AgentSessionManager>();
 
 var app = builder.Build();
+
+AgentPromptBuilder.SystemProvider = app.Services.GetService<ISystemProvider>();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();

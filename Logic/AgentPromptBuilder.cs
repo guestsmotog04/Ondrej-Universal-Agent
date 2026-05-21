@@ -7,15 +7,23 @@ namespace Thio_Universal_Agent.Logic;
 public static class AgentPromptBuilder
 {
     /// <summary>
+    /// Platform-specific system info provider. Set this once at startup before
+    /// any prompts are built. When <see langword="null"/> the system-info block is omitted.
+    /// </summary>
+    public static ISystemProvider? SystemProvider { get; set; }
+    /// <summary>
     /// Produces the full instruction prompt including the user's goal.
     /// This is sent as the first message alongside the initial screenshot.
     /// </summary>
     public static string BuildSystemPrompt(string goal)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(goal);
+        string systemInfo = "Basic System Info:\n" + BuildSystemInfoString();
 
         return $"""
             You are an autonomous computer agent. You control a real desktop computer by looking at screenshots and issuing actions. You have NO access to terminals, APIs, or code — only visual perception and the tools listed below.
+
+            {systemInfo}
 
             ═══════════════════════════════════
             AVAILABLE TOOLS
@@ -100,6 +108,23 @@ public static class AgentPromptBuilder
 
             Below is a screenshot of the current screen state. Begin.
             """;
+    }
+
+    /// <summary>
+    /// Creates a string with basic info about the system, like OS version, etc.
+    /// </summary>
+    /// <returns></returns>
+    private static string BuildSystemInfoString()
+    {
+        if (SystemProvider is null)
+            return string.Empty;
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"OS: {SystemProvider.GetOSName()} — {SystemProvider.GetOSDescription()}");
+        sb.AppendLine($"Architecture: {SystemProvider.GetArchitecture()}");
+        sb.AppendLine($"Current Culture: {System.Globalization.CultureInfo.CurrentCulture.DisplayName}");
+        sb.AppendLine($"Current Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss} (UTC: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss})");
+        return sb.ToString().TrimEnd();
     }
 
     /// <summary>
