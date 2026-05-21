@@ -95,6 +95,19 @@ public class WindowsScreenProvider(IConfiguration configuration) : IScreenProvid
                     // For full virtual screen this includes secondary monitors to the left/above.
                     // For a single monitor this is the monitor's top-left corner.
                     NativeMethods.BitBlt(destHdc, 0, 0, width, height, hdc, x, y, NativeMethods.SRCCOPY);
+
+                    // Draw the cursor on top of the captured image
+                    var cursorInfo = new NativeMethods.CURSORINFO { cbSize = (uint)Marshal.SizeOf<NativeMethods.CURSORINFO>() };
+                    if (NativeMethods.GetCursorInfo(ref cursorInfo) &&
+                        cursorInfo.flags == NativeMethods.CURSOR_SHOWING &&
+                        cursorInfo.hCursor != IntPtr.Zero)
+                    {
+                        // Translate from virtual-desktop coordinates to image-local coordinates
+                        int cx = cursorInfo.ptScreenPos.x - x;
+                        int cy = cursorInfo.ptScreenPos.y - y;
+                        NativeMethods.DrawIconEx(destHdc, cx, cy, cursorInfo.hCursor,
+                            0, 0, 0, IntPtr.Zero, NativeMethods.DI_NORMAL);
+                    }
                 }
                 finally
                 {
@@ -189,4 +202,31 @@ internal static class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Auto), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    internal const uint CURSOR_SHOWING = 0x00000001;
+    internal const uint DI_NORMAL      = 0x0003;
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct POINT
+    {
+        public int x, y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct CURSORINFO
+    {
+        public uint   cbSize;
+        public uint   flags;
+        public IntPtr hCursor;
+        public POINT  ptScreenPos;
+    }
+
+    [DllImport("user32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetCursorInfo(ref CURSORINFO pci);
+
+    [DllImport("user32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool DrawIconEx(IntPtr hdc, int xLeft, int yTop, IntPtr hIcon,
+        int cxWidth, int cyWidth, uint istepIfAniCur, IntPtr hbrFlickerFreeDraw, uint diFlags);
 }
