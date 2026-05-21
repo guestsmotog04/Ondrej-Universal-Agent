@@ -49,6 +49,12 @@ namespace Thio_Universal_Agent.OS_Windows
         [DllImport("user32.dll", SetLastError = true), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
 
+        [DllImport("user32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        private static extern int GetSystemMetrics(int nIndex);
+
+        private const int SM_CXVIRTUALSCREEN = 78;
+        private const int SM_CYVIRTUALSCREEN = 79;
+
         private static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = new IntPtr(-4);
 
         // Dictionary to store virtual key codes
@@ -124,6 +130,9 @@ namespace Thio_Universal_Agent.OS_Windows
         public const uint MOUSEEVENTF_LEFTUP = 0x0004;
         public const uint MOUSEEVENTF_RIGHTDOWN = 0x0008;
         public const uint MOUSEEVENTF_RIGHTUP = 0x0010;
+        public const uint MOUSEEVENTF_MOVE = 0x0001;
+        public const uint MOUSEEVENTF_ABSOLUTE = 0x8000;
+        public const uint MOUSEEVENTF_VIRTUALDESK = 0x4000;
         public const uint MOUSEEVENTF_MIDDLEDOWN = 0x0020;
         public const uint MOUSEEVENTF_MIDDLEUP = 0x0040;
         public const uint MOUSEEVENTF_WHEEL = 0x0800;
@@ -575,26 +584,67 @@ namespace Thio_Universal_Agent.OS_Windows
             _ = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
         }
 
+        /// <summary>
+        /// Injects a hardware mouse-move event via SendInput using absolute normalized coordinates.
+        /// Unlike SetCursorPos, this pushes through the hardware input queue so applications
+        /// that process WM_MOUSEMOVE from the queue (e.g. during a drag) receive the event.
+        /// </summary>
+        private static void SendMouseMove(int screenX, int screenY)
+        {
+            int vScreenWidth  = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+            int vScreenHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+            // Normalize to [0, 65535] as required by MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
+            int normalizedX = (screenX * 65535 + vScreenWidth  / 2) / vScreenWidth;
+            int normalizedY = (screenY * 65535 + vScreenHeight / 2) / vScreenHeight;
+
+            INPUT[] inputs =
+            [
+                new INPUT
+                {
+                    type = INPUT_MOUSE,
+                    u = new InputUnion
+                    {
+                        mi = new MOUSEINPUT
+                        {
+                            dx       = normalizedX,
+                            dy       = normalizedY,
+                            dwFlags  = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
+                        }
+                    }
+                }
+            ];
+            _ = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
+        }
+
         public async Task ClickDrag_MonitorCoords(int x_start, int y_start, int x_end, int y_end)
         {
+            // SetThreadDpiAwarenessContext is thread-local; capture and restore on each segment
+            // because await continuations may resume on a different thread-pool thread.
             IntPtr originalContext = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
             // Move to start and press left button down
-            SetCursorPos(x_start, y_start);
+            SendMouseMove(x_start, y_start);
             SendMouseEvent(MOUSEEVENTF_LEFTDOWN);
+
+            SetThreadDpiAwarenessContext(originalContext);
 
             // Brief delay so the target application registers the drag initiation
             await Task.Delay(50);
 
-            // Move to end and release left button
-            SetCursorPos(x_end, y_end);
+            // Re-apply DPI context on the (potentially new) continuation thread
+            originalContext = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
+            // Use SendInput (hardware input queue) instead of SetCursorPos so that applications
+            // processing WM_MOUSEMOVE during a drag actually receive the move event.
+            SendMouseMove(x_end, y_end);
+
+            SetThreadDpiAwarenessContext(originalContext);
 
             // Brief delay so the cursor movement is recognized before the button release
             await Task.Delay(50);
 
             SendMouseEvent(MOUSEEVENTF_LEFTUP);
-
-            SetThreadDpiAwarenessContext(originalContext);
         }
 
         public enum ScrollMode : int
