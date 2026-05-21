@@ -16,6 +16,14 @@ public enum GeminiMediaResolution
     High
 }
 
+public enum GeminiThinkingLevel
+{
+    minimal,
+    low,
+    medium,
+    high
+}
+
 /// <summary>
 /// Gemini REST API implementation of <see cref="IAiProvider"/>.
 /// Communicates with the Gemini generateContent endpoint using <see cref="HttpClient"/>.
@@ -34,14 +42,14 @@ public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configu
     // via the web UI (configuration["Gemini:ApiKey"] is set by the /api/agent/start endpoint).
     // Validation is deferred to SendRequestAsync so that constructing this type never throws.
     private readonly string? _apiKey = configuration["Gemini:ApiKey"] is { } k && !string.IsNullOrWhiteSpace(k) ? k : null;
-    private readonly string _model = configuration["Gemini:Model"] ?? "gemini-2.0-flash";
-    private readonly GeminiGenerationConfig? _generationConfig = BuildGenerationConfig(configuration, configuration["Gemini:Model"] ?? "gemini-2.0-flash");
+    private readonly string _model = configuration["Gemini:Model"] ?? "gemini-2.0-flash"; //TODO: Remove hard coded model name
+    private readonly GeminiGenerationConfig? _generationConfig = BuildGenerationConfig(configuration, configuration["Gemini:Model"] ?? "gemini-2.0-flash"); //TODO: Remove hard coded model name
 
     private static GeminiGenerationConfig? BuildGenerationConfig(IConfiguration configuration, string model)
     {
         string? resString = null;
-        if (Enum.TryParse<GeminiMediaResolution>(configuration["Gemini:MediaResolution"], true, out var resolution) &&
-            resolution is not GeminiMediaResolution.Unspecified)
+        if (Enum.TryParse<GeminiMediaResolution>(configuration["Gemini:MediaResolution"], true, out var resolution)
+            && resolution is not GeminiMediaResolution.Unspecified)
         {
             resString = resolution switch
             {
@@ -61,9 +69,10 @@ public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configu
 
         if (model.Contains("gemini-3", StringComparison.OrdinalIgnoreCase))
         {
-            string? thinkingLevel = configuration["Gemini:ThinkingLevel"];
-            if (!string.IsNullOrWhiteSpace(thinkingLevel))
-                thinkingConfig = new GeminiThinkingConfig(null, thinkingLevel);
+            string? thinkingLevel = configuration["Gemini:ThinkingLevel"]?.ToLower();
+            // Validate against GeminiThinkingLevel enum types
+            if (!string.IsNullOrWhiteSpace(thinkingLevel) && Enum.TryParse<GeminiThinkingLevel>(thinkingLevel, true, out var level))
+                thinkingConfig = new GeminiThinkingConfig(null, level.ToString());
         }
         else
         {

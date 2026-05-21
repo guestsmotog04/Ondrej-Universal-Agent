@@ -417,8 +417,8 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, IConfigur
         return $"This is a {normalizedWidth:N0}x{normalizedHeight:N0} screenshot." // N0 ensures numbers displayed with commas. Model seems to be more accurate with that.
              + $"\nIdentify the absolute pixel coordinates of the item with the following description in the given screenshot: {itemToIdentify}"
              + $"\n\nRespond with {CoordResponseCode.COORDS} followed by the X,Y pixel coordinates."
-             + $"\nExample Response: \"{CoordResponseCode.COORDS} 1234, 567\""
-             + $"\nIf you cannot find the item, respond with {CoordResponseCode.CANNOT_FIND}.";
+             + $"\nExample Response: \"{CoordResponseCode.COORDS} 454, 567\""
+             + $"\nIf you cannot find the item, respond with {CoordResponseCode.CANNOT_FIND}";
     }
 
     /// <summary>Builds the prompt text that asks the LLM to identify grid coordinates.</summary>
