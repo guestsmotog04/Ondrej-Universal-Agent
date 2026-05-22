@@ -12,10 +12,10 @@ public class WindowsScreenProvider(AppConfig appConfig) : IScreenProvider
 {
     /// <summary>
     /// Returns the zero-based monitor index from config, or null for all-monitors mode.
-    /// Read fresh on every call so that per-session changes to <see cref="AppConfig.AgentMonitorIndex"/>
+    /// Read fresh on every call so that per-session changes to <see cref="AgentConfig.MonitorIndex"/>
     /// take effect without a service restart.
     /// </summary>
-    private int? SelectedMonitorIndex => appConfig.AgentMonitorIndex;
+    private int? SelectedMonitorIndex => appConfig.Agent.MonitorIndex;
 
     public IReadOnlyList<MonitorInfo> GetMonitors()
     {

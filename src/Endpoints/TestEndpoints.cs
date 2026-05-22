@@ -225,8 +225,11 @@ internal static class TestEndpoints
                     // TODO: Change the way default model is handled here instead of hard coding
                     var overrideConfig = new AppConfig
                     {
-                        GeminiApiKey = req.ApiKey,
-                        GeminiModel  = string.IsNullOrWhiteSpace(req.Model) ? appConfig.GeminiModel : req.Model
+                        Gemini = new GeminiConfig
+                        {
+                            ApiKey = req.ApiKey,
+                            Model  = string.IsNullOrWhiteSpace(req.Model) ? appConfig.Gemini.Model : req.Model
+                        }
                     };
                     var httpClient = httpClientFactory.CreateClient();
                     var logger = loggerFactory.CreateLogger<GeminiProvider>();

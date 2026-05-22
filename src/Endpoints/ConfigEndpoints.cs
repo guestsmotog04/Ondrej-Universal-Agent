@@ -14,21 +14,21 @@ internal static class ConfigEndpoints
         {
             var response = new AppConfigResponse(
                 Agent: new AgentConfigDto(
-                        SettleDelayMs:       appConfig.AgentSettleDelayMs,
-                        CoordinateMode:      appConfig.AgentCoordinateMode.ToString(),
-                        MonitorIndex:        appConfig.AgentMonitorIndex,
-                        EnableContextReset:  appConfig.AgentEnableContextReset,
-                        StripHistoryImages:  appConfig.AgentStripHistoryImages
+                        SettleDelayMs:       appConfig.Agent.AgentSettleDelayMs,
+                        CoordinateMode:      appConfig.Agent.CoordinateMode.ToString(),
+                        MonitorIndex:        appConfig.Agent.MonitorIndex,
+                        EnableContextReset:  appConfig.Agent.EnableContextReset,
+                        StripHistoryImages:  appConfig.Agent.StripHistoryImages
                     ),
                 Gemini: new GeminiConfigDto(
-                    Model:                    appConfig.GeminiModel,
-                    MediaResolution:          appConfig.GeminiMediaResolution.ToString(),
-                    Temperature:              (double?)appConfig.GeminiTemperature,
-                    TopP:                     (double?)appConfig.GeminiTopP,
-                    TopK:                     appConfig.GeminiTopK,
-                    CoordinateMaxOutputTokens: appConfig.GeminiCoordinateMaxOutputTokens,
-                    ThinkingBudget:           appConfig.GeminiThinkingBudget,
-                    ThinkingLevel:            appConfig.GeminiThinkingLevel
+                    Model:                    appConfig.Gemini.Model,
+                    MediaResolution:          appConfig.Gemini.MediaResolution.ToString(),
+                    Temperature:              (double?)appConfig.Gemini.Temperature,
+                    TopP:                     (double?)appConfig.Gemini.TopP,
+                    TopK:                     appConfig.Gemini.TopK,
+                    CoordinateMaxOutputTokens: appConfig.Gemini.CoordinateMaxOutputTokens,
+                    ThinkingBudget:           appConfig.Gemini.ThinkingBudget,
+                    ThinkingLevel:            appConfig.Gemini.ThinkingLevel
                 )
             );
 

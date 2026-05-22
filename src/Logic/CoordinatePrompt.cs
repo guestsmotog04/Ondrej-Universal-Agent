@@ -30,11 +30,11 @@ public enum CoordinateMode
 public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig appConfig)
 {
     private readonly AiRequestOptions? _coordinateRequestOptions =
-        appConfig.GeminiCoordinateMaxOutputTokens is { } maxTokens
+        appConfig.Gemini.CoordinateMaxOutputTokens is { } maxTokens
             ? new AiRequestOptions(MaxOutputTokens: maxTokens)
             : null;
 
-    private readonly CoordinateMode _defaultCoordinateMode = appConfig.AgentCoordinateMode;
+    private readonly CoordinateMode _defaultCoordinateMode = appConfig.Agent.CoordinateMode;
 
     private const int DefaultDivisions = 10;
     private const double DefaultConfidencePixels = 15.0;

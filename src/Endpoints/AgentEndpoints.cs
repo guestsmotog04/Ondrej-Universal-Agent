@@ -35,13 +35,13 @@ internal static class AgentEndpoints
                 return Results.BadRequest(new { error = "API key is required." });
 
             // Store the key so the next GeminiProvider instance picks it up
-            appConfig.GeminiApiKey = req.ApiKey;
+            appConfig.Gemini.ApiKey = req.ApiKey;
 
             if (!string.IsNullOrWhiteSpace(req.Model))
-                appConfig.GeminiModel = req.Model;
+                appConfig.Gemini.Model = req.Model;
 
             // Set or clear the monitor selection for this session
-            appConfig.AgentMonitorIndex = req.MonitorIndex;
+            appConfig.Agent.MonitorIndex = req.MonitorIndex;
 
             string sessionId = manager.StartSession(req.Goal);
             return Results.Ok(new { sessionId });

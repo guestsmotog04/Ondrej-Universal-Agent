@@ -23,9 +23,9 @@ public sealed class AgentLoop(
     private const int ContextResetInterval = 8;
     private const string ScreenMimeType = "image/jpeg";
 
-    private readonly int _settleDelayMs = appConfig.AgentSettleDelayMs;
+    private readonly int _settleDelayMs = appConfig.Agent.AgentSettleDelayMs;
 
-    private readonly bool _enableContextReset = appConfig.AgentEnableContextReset;
+    private readonly bool _enableContextReset = appConfig.Agent.EnableContextReset;
 
     /// <summary>
     /// Runs the agent loop to completion for the given session.

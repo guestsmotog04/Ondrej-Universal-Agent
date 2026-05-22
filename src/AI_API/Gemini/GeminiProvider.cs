@@ -38,16 +38,16 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
     // Not validated here — the key may be absent at construction time and supplied later
-    // via the web UI (AppConfig.GeminiApiKey is set by the /api/agent/start endpoint).
+    // via the web UI (AppConfig.Gemini.ApiKey is set by the /api/agent/start endpoint).
     // Validation is deferred to SendRequestAsync so that constructing this type never throws.
-    private readonly string? _apiKey = appConfig.GeminiApiKey;
-    private readonly string _model = appConfig.GeminiModel;
-    private readonly GeminiGenerationConfig? _generationConfig = BuildGenerationConfig(appConfig);
+    private readonly string? _apiKey = appConfig.Gemini.ApiKey;
+    private readonly string _model = appConfig.Gemini.Model;
+    private readonly GeminiGenerationConfig? _generationConfig = BuildGenerationConfig(appConfig.Gemini);
 
-    private static GeminiGenerationConfig? BuildGenerationConfig(AppConfig appConfig)
+    private static GeminiGenerationConfig? BuildGenerationConfig(GeminiConfig gemini)
     {
-        string? resString = appConfig.GeminiMediaResolution is not GeminiMediaResolution.Unspecified
-            ? appConfig.GeminiMediaResolution switch
+        string? resString = gemini.MediaResolution is not GeminiMediaResolution.Unspecified
+            ? gemini.MediaResolution switch
             {
                 GeminiMediaResolution.Low    => "MEDIA_RESOLUTION_LOW",
                 GeminiMediaResolution.Medium => "MEDIA_RESOLUTION_MEDIUM",
@@ -56,23 +56,23 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
             }
             : null;
 
-        float? temp      = appConfig.GeminiTemperature;
-        float? topP      = appConfig.GeminiTopP;
-        int?   topK      = appConfig.GeminiTopK;
-        int?   maxTokens = appConfig.GeminiMaxOutputTokens;
+        float? temp      = gemini.Temperature;
+        float? topP      = gemini.TopP;
+        int?   topK      = gemini.TopK;
+        int?   maxTokens = gemini.MaxOutputTokens;
 
         GeminiThinkingConfig? thinkingConfig = null;
 
-        if (appConfig.GeminiModel.Contains("gemini-3", StringComparison.OrdinalIgnoreCase))
+        if (gemini.Model.Contains("gemini-3", StringComparison.OrdinalIgnoreCase))
         {
-            string? thinkingLevel = appConfig.GeminiThinkingLevel?.ToLower();
+            string? thinkingLevel = gemini.ThinkingLevel?.ToLower();
             // Validate against GeminiThinkingLevel enum values
             if (!string.IsNullOrWhiteSpace(thinkingLevel) && Enum.TryParse<GeminiThinkingLevel>(thinkingLevel, true, out var level))
                 thinkingConfig = new GeminiThinkingConfig(null, level.ToString());
         }
         else
         {
-            if (appConfig.GeminiThinkingBudget is { } tb)
+            if (gemini.ThinkingBudget is { } tb)
                 thinkingConfig = new GeminiThinkingConfig(tb, null);
         }
 
@@ -179,7 +179,7 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
     {
         // Re-read from AppConfig at call time so a key set after construction
         // (e.g. via the web UI /api/agent/start endpoint) is always picked up.
-        var apiKey = _apiKey ?? appConfig.GeminiApiKey;
+        var apiKey = _apiKey ?? appConfig.Gemini.ApiKey;
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new InvalidOperationException("Gemini:ApiKey is not configured. Provide an API key via the web UI.");
 
@@ -238,7 +238,7 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
 
     private GeminiRequest BuildRequest(AiConversation conversation, AiChatMessage additionalMessage)
     {
-        bool stripHistoryImages = appConfig.AgentStripHistoryImages;
+        bool stripHistoryImages = appConfig.Agent.StripHistoryImages;
 
         var contents = new List<GeminiContent>(conversation.Messages.Count + 1);
 
