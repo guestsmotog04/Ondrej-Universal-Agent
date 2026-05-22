@@ -17,7 +17,8 @@ internal static class ConfigEndpoints
                         SettleDelayMs:       cfg.GetValue<int>("Agent:SettleDelayMs"),
                         CoordinateMode:      cfg["Agent:CoordinateMode"],
                         MonitorIndex:        cfg.GetValue<int?>("Agent:MonitorIndex"),
-                        EnableContextReset:  cfg.GetValue<bool?>("Agent:EnableContextReset") ?? true
+                        EnableContextReset:  cfg.GetValue<bool?>("Agent:EnableContextReset") ?? true,
+                        StripHistoryImages:  cfg.GetValue<bool?>("Agent:StripHistoryImages") ?? true
                     ),
                 Gemini: new GeminiConfigDto(
                     Model:                    cfg["Gemini:Model"],
@@ -47,7 +48,8 @@ internal sealed record AgentConfigDto(
     int     SettleDelayMs,
     string? CoordinateMode,
     int?    MonitorIndex,
-    bool    EnableContextReset
+    bool    EnableContextReset,
+    bool    StripHistoryImages
 );
 
 internal sealed record GeminiConfigDto(

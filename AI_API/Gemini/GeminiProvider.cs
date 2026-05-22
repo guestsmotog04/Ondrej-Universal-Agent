@@ -242,16 +242,18 @@ public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configu
 
     private GeminiRequest BuildRequest(AiConversation conversation, AiChatMessage additionalMessage)
     {
+        bool stripHistoryImages = !bool.TryParse(configuration["Agent:StripHistoryImages"], out var s) || s;
+
         var contents = new List<GeminiContent>(conversation.Messages.Count + 1);
 
         foreach (var message in conversation.Messages)
-            contents.Add(ToGeminiContent(message));
+            contents.Add(ToGeminiContent(message, stripImages: stripHistoryImages));
 
-        contents.Add(ToGeminiContent(additionalMessage));
+        contents.Add(ToGeminiContent(additionalMessage, stripImages: false));
         return new GeminiRequest(contents, _generationConfig);
     }
 
-    private static GeminiContent ToGeminiContent(AiChatMessage message)
+    private static GeminiContent ToGeminiContent(AiChatMessage message, bool stripImages = false)
     {
         var role = message.Role == AiChatRole.User ? "user" : "model";
         var parts = new List<GeminiPart>();
@@ -259,7 +261,7 @@ public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configu
         if (message.Text is not null)
             parts.Add(new GeminiPart(message.Text, null));
 
-        if (message.ImageBytes is not null)
+        if (!stripImages && message.ImageBytes is not null)
             parts.Add(new GeminiPart(null, new GeminiInlineData(message.MimeType ?? "image/jpeg", Convert.ToBase64String(message.ImageBytes))));
 
         return new GeminiContent(role, parts);
