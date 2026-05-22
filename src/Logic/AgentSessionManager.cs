@@ -15,10 +15,7 @@ public sealed class AgentSessionManager(
 {
     private readonly ConcurrentDictionary<string, AgentSession> _sessions = new();
 
-    /// <summary>
-    /// Creates a new agent session for the given goal and starts the agent loop
-    /// on a background task.
-    /// </summary>
+    /// <summary> Creates a new agent session for the given goal and starts the agent loop on a background task.</summary>
     /// <returns>The session ID.</returns>
     public string StartSession(string goal)
     {

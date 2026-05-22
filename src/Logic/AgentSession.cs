@@ -5,16 +5,12 @@ public enum AgentSessionStatus
 {
     /// <summary>The agent loop is actively running.</summary>
     Running,
-
     /// <summary>The goal was achieved (agent issued DONE).</summary>
     Completed,
-
     /// <summary>The agent declared failure or exceeded the step limit.</summary>
     Failed,
-
     /// <summary>The session was cancelled by the user.</summary>
     Cancelled,
-
     /// <summary>An unexpected error terminated the session.</summary>
     Error,
 }

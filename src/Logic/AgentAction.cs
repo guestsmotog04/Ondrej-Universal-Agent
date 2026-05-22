@@ -5,43 +5,30 @@ public enum AgentActionKind
 {
     /// <summary>Left-clicks a UI element identified by a natural-language description.</summary>
     LeftClick,
-
     /// <summary>Right-clicks a UI element identified by a natural-language description.</summary>
     RightClick,
-
     /// <summary>Double-left-clicks a UI element identified by a natural-language description.</summary>
     DoubleClick,
-
     /// <summary>Middle-clicks a UI element identified by a natural-language description.</summary>
     MiddleClick,
-
     /// <summary>Moves the mouse cursor to a UI element without clicking.</summary>
     MoveMouse,
-
     /// <summary>Left click and hold, then moves the mouse to another location before releasing. </summary>
     ClickDrag,
-
     /// <summary>Left click and hold at exact coordinates, then move to another set of coordinates before releasing.</summary>
     ClickDragCoords,
-
     /// <summary>Types a string of text via the keyboard.</summary>
     TypeText,
-
     /// <summary>Presses a key combination (e.g. ctrl+s, alt+f4, enter).</summary>
     KeyCombo,
-
     /// <summary>Scrolls up by a given number of notches.</summary>
     ScrollUp,
-
     /// <summary>Scrolls down by a given number of notches.</summary>
     ScrollDown,
-
     /// <summary>Pauses execution for a given number of seconds.</summary>
     Wait,
-
     /// <summary>Signals the goal has been achieved.</summary>
     Done,
-
     /// <summary>Signals the goal cannot be achieved.</summary>
     Fail,
 }
@@ -61,32 +48,19 @@ public enum AgentActionAltMode
 {
     None,
 
-    /// <summary>
-    /// For ClickDrag, becomes ClickDragCoords to provide exact coordiantes. <see cref="AgentActionKind.ClickDragCoords"/>
-    /// </summary>
+    /// <summary>For ClickDrag, becomes ClickDragCoords to provide exact coordiantes. <see cref="AgentActionKind.ClickDragCoords"/> </summary>
     ExactCoords, 
 
-    /// <summary>
-    /// Instead of providing coordinates, use the cursor's current position without moving it.
-    /// </summary>
+    /// <summary>Instead of providing coordinates, use the cursor's current position without moving it.</summary>
     CurrentCursorPosition,
 
-    /// <summary>
-    /// For <see cref="AgentActionKind.ClickDragCoords"/>: use the cursor's current position as the
-    /// drag start point; the end point comes from the parsed coordinates.
-    /// </summary>
+    /// <summary>For <see cref="AgentActionKind.ClickDragCoords"/>: use the cursor's current position as the drag start point; the end point comes from the parsed coordinates.</summary>
     CurrentCursorPositionStart,
 
-    /// <summary>
-    /// For <see cref="AgentActionKind.ClickDragCoords"/>: use the cursor's current position as the
-    /// drag end point; the start point comes from the parsed coordinates.
-    /// </summary>
+    /// <summary>For <see cref="AgentActionKind.ClickDragCoords"/>: use the cursor's current position as the drag end point; the start point comes from the parsed coordinates. </summary>
     CurrentCursorPositionEnd,
 
-    /// <summary>
-    /// For <see cref="AgentActionKind.ClickDragCoords"/>: use the cursor's current position for
-    /// both the drag start and end points (no parsed coordinates needed).
-    /// </summary>
+    /// <summary>For <see cref="AgentActionKind.ClickDragCoords"/>: use the cursor's current position for both the drag start and end points (no parsed coordinates needed).</summary>
     CurrentCursorPositionBoth,
 }
 

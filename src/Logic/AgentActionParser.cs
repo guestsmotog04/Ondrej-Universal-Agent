@@ -15,9 +15,7 @@ public static class AgentActionParser
     private const string ThoughtPrefix = "THOUGHT:";
     private const string ActionPrefix = "ACTION:";
 
-    /// <summary>
-    /// Attempts to parse the AI's response text into a thought and action.
-    /// </summary>
+    /// <summary> Attempts to parse the AI's response text into a thought and action. </summary>
     /// <returns>True if parsing succeeded; false otherwise.</returns>
     public static bool TryParse(string responseText, [NotNullWhen(true)] out AgentParsedResponse? result, [NotNullWhen(false)] out string? error)
     {
@@ -326,9 +324,7 @@ public static class AgentActionParser
         return true;
     }
 
-    /// <summary>
-    /// Parses KEY_COMBO whose argument is a key expression like "enter", "ctrl+s", "ctrl+shift+a".
-    /// </summary>
+    /// <summary> Parses KEY_COMBO whose argument is a key expression like "enter", "ctrl+s", "ctrl+shift+a". </summary>
     private static bool TryParseKeyComboAction(
         string args,
         [NotNullWhen(true)] out AgentAction? action,

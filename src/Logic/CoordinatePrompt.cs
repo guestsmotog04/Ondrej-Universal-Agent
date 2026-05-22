@@ -13,31 +13,23 @@ namespace Thio_Universal_Agent.Logic;
 /// <summary>Determines how <see cref="CoordinatePrompter"/> locates a UI element.</summary>
 public enum CoordinateMode
 {
-    /// <summary>
-    /// Overlays a grid on the screenshot and iteratively zooms in to narrow down
-    /// the target location (default behaviour).
-    /// </summary>
+    /// <summary> Overlays a grid on the screenshot and iteratively zooms in to narrow down the target location (default behaviour). </summary>
     Zoom,
 
     /// <summary>
-    /// Sends the raw screenshot to the AI in a single prompt and asks for the
-    /// absolute pixel coordinates directly, with no grid overlay or zoom loop.
+    /// Sends the raw screenshot to the AI in a single prompt and asks for the absolute pixel coordinates directly, with no grid overlay or zoom loop.
     /// The model is told the true original image dimensions.
     /// </summary>
     Direct,
 
     /// <summary>
-    /// Sends the raw screenshot to the AI in a single prompt and asks for the
-    /// absolute pixel coordinates directly, with no grid overlay or zoom loop.
+    /// Sends the raw screenshot to the AI in a single prompt and asks for the absolute pixel coordinates directly, with no grid overlay or zoom loop.
     /// The model is made to use normalized coordinates (usually more accurate).
     /// </summary>
     DirectAutoNormalize
 }
 
-/// <summary>
-/// Locates UI elements on screen by iteratively prompting an AI model
-/// with grid-overlaid screenshots and refining coordinates through zoom.
-/// </summary>
+/// <summary> Locates UI elements on screen by iteratively prompting an AI model with grid-overlaid screenshots and refining coordinates through zoom. </summary>
 public sealed partial class CoordinatePrompter(IAiProvider aiProvider, IConfiguration configuration)
 {
     private readonly AiRequestOptions? _coordinateRequestOptions =
@@ -337,10 +329,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, IConfigur
     }
 
 
-    /// <summary>
-    /// Sends the raw screenshot to the AI in a single request and returns the absolute
-    /// pixel coordinates reported by the model, with no grid overlay or zoom.
-    /// </summary>
+    /// <summary> Sends the raw screenshot to the AI in a single request and returns the absolute pixel coordinates reported by the model, with no grid overlay or zoom. </summary>
     private async Task<(double X, double Y, double? NormX, double? NormY)> GetCoordinatesDirectAsync(
         byte[] screenshotBytes,
         string itemToIdentify,
@@ -727,9 +716,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, IConfigur
             return true;
     }
 
-    /// <summary>
-    /// Converts normalized grid coordinates to their original given a resolution
-    /// </summary>
+    /// <summary> Converts normalized grid coordinates to their original given a resolution </summary>
     private static (double TrueXCoords, double TrueYCoords) UnNormalizeCoordinates(GridCoordinate coordinate, int normalizedWidth, int normalizedHeight, int originalWidth,int originalHeight)
     {
         // Round to nearest whole first
@@ -750,10 +737,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, IConfigur
         return (TrueXCoord, TrueYCoord);
     }
 
-    /// <summary>
-    /// Converts grid coordinates on the current (possibly zoomed) view back to
-    /// absolute screen pixel coordinates, assuming the original image matches screen resolution.
-    /// </summary>
+    /// <summary> Converts grid coordinates on the current (possibly zoomed) view back to absolute screen pixel coordinates, assuming the original image matches screen resolution. </summary>
     private static (double ScreenX, double ScreenY) CalculateScreenCoordinates(
         ViewRegion currentView,
         GridCoordinate coordinate,

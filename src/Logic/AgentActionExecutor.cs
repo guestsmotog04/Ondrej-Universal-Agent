@@ -6,10 +6,8 @@ using System.Globalization;
 namespace Thio_Universal_Agent.Logic;
 
 /// <summary>
-/// Executes a single <see cref="AgentAction"/> by dispatching to the appropriate
-/// <see cref="IInputProvider"/> or <see cref="CoordinatePrompter"/> methods.
-/// When <see cref="Globals.ENABLE_TESTING"/> is true, captures detailed debug entries
-/// including coordinate resolution steps.
+/// Executes a single <see cref="AgentAction"/> by dispatching to the appropriate <see cref="IInputProvider"/> or <see cref="CoordinatePrompter"/> methods.
+/// When <see cref="Globals.ENABLE_TESTING"/> is true, captures detailed debug entries including coordinate resolution steps.
 /// </summary>
 public sealed class AgentActionExecutor(
     IInputProvider inputProvider,
@@ -24,8 +22,7 @@ public sealed class AgentActionExecutor(
     /// For click/move actions, <paramref name="currentScreenshot"/> is used by the
     /// <see cref="CoordinatePrompter"/> to resolve the target description to pixel coordinates.
     /// </summary>
-    /// <param name="onProgress">Optional callback invoked for each debug entry as it is produced,
-    /// enabling real-time streaming to the UI before the full step completes.</param>
+    /// <param name="onProgress">Optional callback invoked for each debug entry as it is produced, enabling real-time streaming to the UI before the full step completes.</param>
     public async Task<ActionExecutionResult> ExecuteAsync(
         AgentAction action,
         byte[] currentScreenshot,
