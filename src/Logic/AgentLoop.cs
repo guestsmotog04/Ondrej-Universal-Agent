@@ -23,7 +23,7 @@ public sealed class AgentLoop(
     private const int ContextResetInterval = 8;
     private const string ScreenMimeType = "image/jpeg";
 
-    private readonly int _settleDelayMs = appConfig.Agent.AgentSettleDelayMs;
+    private readonly int _settleDelayMs = appConfig.Agent.SettleDelayMs;
 
     private readonly bool _enableContextReset = appConfig.Agent.EnableContextReset;
 

@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration — Thio Universal Agent</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 24px 32px 18px;
+            border-bottom: 1px solid #222;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        header a { color: #4a9eff; text-decoration: none; font-size: 13px; }
+        header h1 { font-size: 20px; font-weight: 600; color: #fff; }
+
+        /* ── toast ── */
+        #toast {
+            position: fixed;
+            bottom: 28px;
+            right: 32px;
+            background: #1e2e1e;
+            border: 1px solid #2c7a2c;
+            color: #55cc77;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 100;
+        }
+        #toast.show { opacity: 1; pointer-events: none; }
+
+        /* ── action bar ── */
+        .action-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 16px 32px;
+            border-bottom: 1px solid #1e1e1e;
+            background: #161616;
+            flex-wrap: wrap;
+        }
+
+        .action-bar .spacer { flex: 1; }
+
+        .action-bar .status-badge {
+            font-size: 11px;
+            color: #555;
+        }
+
+        /* ── buttons ── */
+        .btn {
+            padding: 8px 18px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+            background: #1a1a1a;
+            color: #ccc;
+        }
+        .btn:hover { background: #222; border-color: #4a9eff; color: #4a9eff; }
+
+        .btn-danger { border-color: #6a2020; color: #cc4444; }
+        .btn-danger:hover { background: #2e1a1a; border-color: #aa3333; color: #ff6666; }
+
+        .btn-primary { background: #163a63; border-color: #2a5a9a; color: #88c4ff; }
+        .btn-primary:hover { background: #1e4a7a; border-color: #4a9eff; color: #b0d9ff; }
+
+        /* ── main layout ── */
+        main {
+            flex: 1;
+            padding: 28px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+            max-width: 900px;
+        }
+
+        /* ── section ── */
+        .config-section {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            padding: 14px 20px;
+            background: #1d1d1d;
+            border-bottom: 1px solid #2a2a2a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #e0e0e0;
+            letter-spacing: 0.2px;
+        }
+
+        .provider-badge {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #4a9eff;
+            background: #0d2540;
+            border: 1px solid #1a3a5c;
+            border-radius: 3px;
+            padding: 2px 7px;
+        }
+
+        .fields-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            background: #242424;
+        }
+
+        /* ── individual field ── */
+        .field-row {
+            background: #1a1a1a;
+            padding: 14px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .field-row.full-width { grid-column: 1 / -1; }
+
+        .field-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #aaa;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .field-browser-badge {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #ccaa33;
+            background: #2e2810;
+            border: 1px solid #5a4a10;
+            border-radius: 2px;
+            padding: 1px 5px;
+        }
+
+        .field-desc {
+            font-size: 11px;
+            color: #555;
+            line-height: 1.4;
+        }
+
+        .field-input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .field-input-wrap input,
+        .field-input-wrap select {
+            width: 100%;
+            padding: 8px 10px;
+            background: #141414;
+            border: 1px solid #333;
+            border-radius: 5px;
+            color: #e0e0e0;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .field-input-wrap input[type="checkbox"] {
+            width: auto;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+            accent-color: #4a9eff;
+            width: 16px;
+            height: 16px;
+        }
+
+        .field-input-wrap input:focus,
+        .field-input-wrap select:focus { border-color: #4a9eff; }
+
+        .field-input-wrap input.changed,
+        .field-input-wrap select.changed { border-color: #ccaa33; }
+
+        .show-pw-btn {
+            position: absolute;
+            right: 8px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #555;
+            font-size: 14px;
+            padding: 2px 4px;
+            line-height: 1;
+        }
+        .show-pw-btn:hover { color: #aaa; }
+
+        .field-input-wrap input[type="password"] { padding-right: 32px; }
+
+        /* ── modal overlay ── */
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+        #modal-overlay.show { display: flex; }
+
+        #modal-box {
+            background: #1e1e1e;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 28px 32px;
+            max-width: 420px;
+            width: 90%;
+        }
+
+        #modal-box h3 { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 10px; }
+        #modal-box p  { font-size: 13px; color: #aaa; line-height: 1.5; margin-bottom: 22px; }
+
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+
+<header>
+    <a href="/">← Home</a>
+    <h1>Configuration</h1>
+</header>
+
+<div class="action-bar">
+    <button class="btn btn-primary" id="btn-save">Save to browser</button>
+    <button class="btn" id="btn-export">Export JSON</button>
+    <div class="spacer"></div>
+    <span class="status-badge" id="save-status">Loading…</span>
+    <button class="btn btn-danger" id="btn-reset">Reset all to defaults</button>
+</div>
+
+<main id="config-main">
+    <!-- sections are rendered dynamically -->
+</main>
+
+<div id="toast">Saved</div>
+
+<div id="modal-overlay">
+    <div id="modal-box">
+        <h3>Reset all settings?</h3>
+        <p>This will clear every setting you have saved in the browser and reload the server defaults. This cannot be undone.</p>
+        <div class="modal-actions">
+            <button class="btn" id="modal-cancel">Cancel</button>
+            <button class="btn btn-danger" id="modal-confirm">Reset</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // @ts-nocheck
+    const STORAGE_KEY = 'tua_config_v1';
+
+    let serverDefaults = {}; // raw schema sections from /api/config/schema
+    let browserValues  = {}; // persisted overrides { sectionKey: { fieldKey: value } }
+    let pendingChanges = {}; // unsaved UI edits { sectionKey: { fieldKey: value } }
+
+    // ── Boot ──────────────────────────────────────────────────────────────────
+
+    async function init() {
+        browserValues = loadFromStorage();
+
+        try {
+            const res = await fetch('/api/config/schema');
+            if (!res.ok) throw new Error('Schema fetch failed');
+            const { sections } = await res.json();
+            serverDefaults = sections;
+            renderSections(sections);
+            applyStoredValues();
+            setStatus('Browser overrides loaded');
+        } catch (err) {
+            document.getElementById('config-main').textContent = 'Failed to load config schema: ' + err.message;
+        }
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────────
+
+    function renderSections(sections) {
+        const main = document.getElementById('config-main');
+        main.innerHTML = '';
+
+        for (const section of sections) {
+            const wrap = document.createElement('div');
+            wrap.className = 'config-section';
+            wrap.dataset.section = section.key;
+
+            // Header
+            const hdr = document.createElement('div');
+            hdr.className = 'section-header';
+            hdr.innerHTML = `<span class="section-title">${escHtml(section.label)}</span>`;
+            if (section.isProvider)
+                hdr.innerHTML += `<span class="provider-badge">AI Provider</span>`;
+            wrap.appendChild(hdr);
+
+            // Fields grid
+            const grid = document.createElement('div');
+            grid.className = 'fields-grid';
+
+            for (const field of section.fields) {
+                const row = buildFieldRow(section.key, field);
+                grid.appendChild(row);
+            }
+
+            wrap.appendChild(grid);
+            main.appendChild(wrap);
+        }
+    }
+
+    function buildFieldRow(sectionKey, field) {
+        const row = document.createElement('div');
+        row.className = 'field-row' + (field.type === 'string' || field.type === 'password' ? ' full-width' : '');
+        row.dataset.section = sectionKey;
+        row.dataset.field   = field.key;
+
+        // label
+        const labelEl = document.createElement('div');
+        labelEl.className = 'field-label';
+        labelEl.textContent = field.label;
+
+        const badge = document.createElement('span');
+        badge.className = 'field-browser-badge';
+        badge.textContent = 'browser';
+        badge.style.display = 'none';
+        badge.title = 'Value overridden in browser storage';
+        labelEl.appendChild(badge);
+        row.appendChild(labelEl);
+
+        // description
+        if (field.description) {
+            const desc = document.createElement('div');
+            desc.className = 'field-desc';
+            desc.textContent = field.description;
+            row.appendChild(desc);
+        }
+
+        // input
+        const inputWrap = document.createElement('div');
+        inputWrap.className = 'field-input-wrap';
+
+        let input;
+
+        if (field.type === 'bool') {
+            input = document.createElement('input');
+            input.type = 'checkbox';
+        } else if (field.type === 'enum') {
+            input = document.createElement('select');
+            if (field.nullable) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = '— server default —';
+                input.appendChild(opt);
+            }
+            for (const opt of (field.options || [])) {
+                const el = document.createElement('option');
+                el.value = opt;
+                el.textContent = opt;
+                input.appendChild(el);
+            }
+        } else {
+            input = document.createElement('input');
+            input.type  = field.type === 'password' ? 'password'
+                        : field.type === 'int'      ? 'number'
+                        : field.type === 'float'    ? 'number'
+                        : 'text';
+            if (field.type === 'float') { input.step = 'any'; input.min = '0'; }
+            if (field.type === 'int')   { input.step = '1';   input.min = '0'; }
+            input.placeholder = field.nullable ? '(inherit server default)' : '';
+        }
+
+        input.dataset.section = sectionKey;
+        input.dataset.field   = field.key;
+
+        // populate with server value
+        setInputValue(input, field.value, field.type);
+
+        input.addEventListener('change', onFieldChange);
+        if (input.type !== 'checkbox') input.addEventListener('input', onFieldChange);
+
+        inputWrap.appendChild(input);
+
+        // show/hide toggle for passwords
+        if (field.type === 'password') {
+            const btn = document.createElement('button');
+            btn.className = 'show-pw-btn';
+            btn.type = 'button';
+            btn.textContent = '👁';
+            btn.title = 'Show / hide';
+            btn.addEventListener('click', () => {
+                input.type = input.type === 'password' ? 'text' : 'password';
+            });
+            inputWrap.appendChild(btn);
+        }
+
+        row.appendChild(inputWrap);
+        return row;
+    }
+
+    // ── Apply stored browser values ───────────────────────────────────────────
+
+    function applyStoredValues() {
+        for (const [sectionKey, fields] of Object.entries(browserValues)) {
+            for (const [fieldKey, value] of Object.entries(fields)) {
+                const input = findInput(sectionKey, fieldKey);
+                if (!input) continue;
+                const field = findFieldMeta(sectionKey, fieldKey);
+                setInputValue(input, value, field?.type ?? 'string');
+                markBrowserOverride(sectionKey, fieldKey, true);
+            }
+        }
+    }
+
+    // ── Change tracking ───────────────────────────────────────────────────────
+
+    function onFieldChange(e) {
+        const input   = e.target;
+        const section = input.dataset.section;
+        const key     = input.dataset.field;
+        const field   = findFieldMeta(section, key);
+
+        const value = getInputValue(input, field?.type ?? 'string');
+
+        pendingChanges[section] ??= {};
+        pendingChanges[section][key] = value;
+        input.classList.add('changed');
+        setStatus('Unsaved changes');
+    }
+
+    // ── Save ──────────────────────────────────────────────────────────────────
+
+    document.getElementById('btn-save').addEventListener('click', async () => {
+        if (Object.keys(pendingChanges).length === 0) {
+            showToast('Nothing to save');
+            return;
+        }
+
+        // Merge pending into browserValues
+        for (const [s, fields] of Object.entries(pendingChanges)) {
+            browserValues[s] ??= {};
+            for (const [k, v] of Object.entries(fields)) {
+                if (v === null || v === undefined || v === '') {
+                    delete browserValues[s][k];
+                } else {
+                    browserValues[s][k] = v;
+                }
+            }
+        }
+        persistToStorage(browserValues);
+
+        // Push to server
+        try {
+            await pushToServer(pendingChanges);
+        } catch { /* non-critical — server values are best-effort */ }
+
+        // Update badge state
+        for (const [s, fields] of Object.entries(pendingChanges)) {
+            for (const k of Object.keys(fields)) {
+                const v = browserValues[s]?.[k];
+                const overridden = (v !== null && v !== undefined && v !== '');
+                markBrowserOverride(s, k, overridden);
+                findInput(s, k)?.classList.remove('changed');
+            }
+        }
+
+        // Keep Agent.html legacy keys in sync
+        syncLegacyKeys();
+
+        pendingChanges = {};
+        showToast('Saved');
+        setStatus('Saved to browser');
+    });
+
+    async function pushToServer(changes) {
+        // POST only the sections that changed
+        const payload = {};
+        for (const [s, fields] of Object.entries(changes)) {
+            payload[s] = {};
+            for (const [k, v] of Object.entries(fields)) {
+                payload[s][k] = v;
+            }
+        }
+        await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+    }
+
+    function syncLegacyKeys() {
+        const apiKey = browserValues?.gemini?.apiKey;
+        const model  = browserValues?.gemini?.model;
+        if (apiKey !== undefined) localStorage.setItem('gemini_api_key', apiKey ?? '');
+        if (model  !== undefined) localStorage.setItem('agent_model',    model  ?? '');
+    }
+
+    // ── Export ────────────────────────────────────────────────────────────────
+
+    document.getElementById('btn-export').addEventListener('click', () => {
+        // Build a clean export from stored browser values
+        const exportObj = {};
+        for (const section of serverDefaults) {
+            exportObj[section.label] = {};
+            for (const field of section.fields) {
+                const stored = browserValues[section.key]?.[field.key];
+                const value  = stored !== undefined ? stored : field.value;
+                if (field.type !== 'password') {
+                    exportObj[section.label][field.label] = value;
+                } else {
+                    exportObj[section.label][field.label] = stored ? '(set)' : '(not set)';
+                }
+            }
+        }
+
+        const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'tua-config.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // ── Reset ─────────────────────────────────────────────────────────────────
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+        document.getElementById('modal-overlay').classList.add('show');
+    });
+    document.getElementById('modal-cancel').addEventListener('click', () => {
+        document.getElementById('modal-overlay').classList.remove('show');
+    });
+    document.getElementById('modal-confirm').addEventListener('click', async () => {
+        document.getElementById('modal-overlay').classList.remove('show');
+
+        // Clear browser storage
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem('gemini_api_key');
+        localStorage.removeItem('agent_model');
+        browserValues  = {};
+        pendingChanges = {};
+
+        // Reload server defaults and re-render
+        try {
+            const res = await fetch('/api/config/schema');
+            const { sections } = await res.json();
+            serverDefaults = sections;
+            renderSections(sections);
+            // No stored values to re-apply
+            // Also push empty patches so runtime AppConfig also resets to its defaults on next restart
+            showToast('Reset to defaults');
+            setStatus('All browser overrides cleared');
+        } catch {
+            location.reload();
+        }
+    });
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    function setInputValue(input, value, type) {
+        if (type === 'bool') {
+            input.checked = !!value;
+        } else if (input.tagName === 'SELECT') {
+            input.value = value ?? '';
+        } else {
+            input.value = (value !== null && value !== undefined) ? String(value) : '';
+        }
+    }
+
+    function getInputValue(input, type) {
+        if (type === 'bool')  return input.checked;
+        if (type === 'int')   return input.value === '' ? null : parseInt(input.value, 10);
+        if (type === 'float') return input.value === '' ? null : parseFloat(input.value);
+        const v = input.value.trim();
+        return v === '' ? null : v;
+    }
+
+    function findInput(sectionKey, fieldKey) {
+        return document.querySelector(
+            `input[data-section="${sectionKey}"][data-field="${fieldKey}"],` +
+            `select[data-section="${sectionKey}"][data-field="${fieldKey}"]`
+        );
+    }
+
+    function findFieldMeta(sectionKey, fieldKey) {
+        const section = serverDefaults.find(s => s.key === sectionKey);
+        return section?.fields.find(f => f.key === fieldKey);
+    }
+
+    function markBrowserOverride(sectionKey, fieldKey, on) {
+        const row = document.querySelector(
+            `.field-row[data-section="${sectionKey}"][data-field="${fieldKey}"]`
+        );
+        if (!row) return;
+        const badge = row.querySelector('.field-browser-badge');
+        if (badge) badge.style.display = on ? 'inline' : 'none';
+    }
+
+    function loadFromStorage() {
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+        catch { return {}; }
+    }
+
+    function persistToStorage(data) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function setStatus(msg) {
+        document.getElementById('save-status').textContent = msg;
+    }
+
+    let toastTimer;
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
+    function escHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    init();
+</script>
+
+</body>
+</html>

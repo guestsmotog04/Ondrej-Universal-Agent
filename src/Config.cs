@@ -4,6 +4,25 @@ using Thio_Universal_Agent.Logic;
 
 namespace Thio_Universal_Agent;
 
+// ── ConfigField annotation ────────────────────────────────────────────────────
+
+/// <summary>
+/// Marks a config property as user-visible. The schema endpoint reflects over these to build
+/// the dynamic web UI; any property without this attribute is invisible to the config page.
+/// </summary>
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class ConfigFieldAttribute(string label) : Attribute
+{
+    /// <summary>Human-readable label shown in the UI.</summary>
+    public string Label { get; } = label;
+
+    /// <summary>Short explanation shown beneath the field.</summary>
+    public string? Description { get; init; }
+
+    /// <summary>When true the input is rendered as a password field with a show/hide toggle.</summary>
+    public bool IsPassword { get; init; }
+}
+
 // ── Provider config interface ─────────────────────────────────────────────────
 
 /// <summary>
@@ -30,21 +49,35 @@ public class GeminiConfig : IAiProviderConfig
     public string ProviderName => "Gemini";
 
     /// <inheritdoc/>
+    [ConfigField("API Key", IsPassword = true, Description = "Your Google AI Studio API key (aistudio.google.com)")]
     public string? ApiKey { get; set; }
 
     /// <inheritdoc/>
+    [ConfigField("Model", Description = "Gemini model identifier, e.g. gemini-2.0-flash")]
     public string Model { get; set; } = "gemini-flash-latest";
 
+    [ConfigField("Media Resolution", Description = "Resolution hint when sending images to the model")]
     public GeminiMediaResolution MediaResolution { get; set; } = GeminiMediaResolution.High;
+
+    [ConfigField("Temperature", Description = "Sampling temperature — 0 is deterministic, higher values increase randomness")]
     public float? Temperature { get; set; }
+
+    [ConfigField("Top-P", Description = "Nucleus sampling: cumulative probability mass of tokens to consider")]
     public float? TopP { get; set; }
-    public int?   TopK { get; set; }
-    public int?   MaxOutputTokens { get; set; }
 
-    /// <summary>Token limit applied only to coordinate-finding requests (typically much smaller than the main limit).</summary>
-    public int?   CoordinateMaxOutputTokens { get; set; }
+    [ConfigField("Top-K", Description = "Number of highest-probability tokens considered at each step")]
+    public int? TopK { get; set; }
 
-    public int?   ThinkingBudget { get; set; }
+    [ConfigField("Max Output Tokens", Description = "Maximum token count for the main model response")]
+    public int? MaxOutputTokens { get; set; }
+
+    [ConfigField("Coordinate Max Tokens", Description = "Token limit for coordinate-finding requests (much smaller saves cost)")]
+    public int? CoordinateMaxOutputTokens { get; set; }
+
+    [ConfigField("Thinking Budget", Description = "Extended-thinking token budget (Gemini 2.x flash models only)")]
+    public int? ThinkingBudget { get; set; }
+
+    [ConfigField("Thinking Level", Description = "Pre-set thinking intensity: minimal / low / medium / high (Gemini 3.x models)")]
     public string? ThinkingLevel { get; set; }
 
     // ── Constructors ──────────────────────────────────────────────────────────
@@ -61,12 +94,12 @@ public class GeminiConfig : IAiProviderConfig
         if (Enum.TryParse<GeminiMediaResolution>(section["MediaResolution"], ignoreCase: true, out var res))
             MediaResolution = res;
 
-        if (float.TryParse(section["Temperature"], out var temp))           Temperature = temp;
-        if (float.TryParse(section["TopP"], out var topP))                  TopP = topP;
-        if (int.TryParse(section["TopK"], out var topK))                    TopK = topK;
-        if (int.TryParse(section["MaxOutputTokens"], out var mOut))         MaxOutputTokens = mOut;
+        if (float.TryParse(section["Temperature"], out var temp))             Temperature = temp;
+        if (float.TryParse(section["TopP"], out var topP))                    TopP = topP;
+        if (int.TryParse(section["TopK"], out var topK))                      TopK = topK;
+        if (int.TryParse(section["MaxOutputTokens"], out var mOut))           MaxOutputTokens = mOut;
         if (int.TryParse(section["CoordinateMaxOutputTokens"], out var cOut)) CoordinateMaxOutputTokens = cOut;
-        if (int.TryParse(section["ThinkingBudget"], out var tb))            ThinkingBudget = tb;
+        if (int.TryParse(section["ThinkingBudget"], out var tb))              ThinkingBudget = tb;
         ThinkingLevel = section["ThinkingLevel"];
     }
 }
@@ -76,13 +109,20 @@ public class GeminiConfig : IAiProviderConfig
 /// <summary>Configuration for the agent loop and session behaviour.</summary>
 public class AgentConfig
 {
-    public int AgentSettleDelayMs { get; set; } = 1500;
+    [ConfigField("Settle Delay (ms)", Description = "Milliseconds to wait after each action before taking the next screenshot")]
+    public int SettleDelayMs { get; set; } = 1500;
+
+    [ConfigField("Coordinate Mode", Description = "Algorithm used to locate UI elements on screen")]
     public CoordinateMode CoordinateMode { get; set; } = CoordinateMode.DirectAutoNormalize;
 
     /// <summary>Zero-based monitor index, or <c>null</c> for all-monitors mode. May be updated at runtime per session.</summary>
+    [ConfigField("Monitor Index", Description = "Zero-based index of the monitor to capture; leave empty for all monitors")]
     public int? MonitorIndex { get; set; }
 
+    [ConfigField("Enable Context Reset", Description = "Periodically trim conversation history to keep token usage in check")]
     public bool EnableContextReset { get; set; } = true;
+
+    [ConfigField("Strip History Images", Description = "Remove screenshots from older messages to reduce token usage")]
     public bool StripHistoryImages { get; set; } = true;
 
     // ── Constructors ──────────────────────────────────────────────────────────
@@ -94,7 +134,7 @@ public class AgentConfig
     public AgentConfig(IConfigurationSection section)
     {
         if (int.TryParse(section["SettleDelayMs"], out var d) && d > 0)
-            AgentSettleDelayMs = d;
+            SettleDelayMs = d;
 
         if (Enum.TryParse<CoordinateMode>(section["CoordinateMode"], ignoreCase: true, out var coordMode))
             CoordinateMode = coordMode;
