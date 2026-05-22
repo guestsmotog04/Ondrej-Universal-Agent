@@ -41,6 +41,12 @@ AgentPromptBuilder.SystemProvider = app.Services.GetService<ISystemProvider>();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    string url = app.Urls.FirstOrDefault() ?? "http://localhost:5112";
+    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+});
+
 app.MapTestEndpoints();
 app.MapAgentEndpoints();
 app.MapConfigEndpoints();
