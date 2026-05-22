@@ -134,6 +134,65 @@ public sealed partial class CoordinatePrompter
     }
 
 
+    /// <summary>
+    /// Returns a copy of <paramref name="imageBytes"/> with two crosshair markers drawn directly at the
+    /// given absolute pixel positions: a green crosshair at the start and a red crosshair at the end,
+    /// connected by an arrow line. Used to visualise drag actions.
+    /// </summary>
+    internal static byte[] CreateAnnotatedImageDrag(byte[] imageBytes, double startX, double startY, double endX, double endY)
+    {
+        using IImage image = LoadImage(imageBytes);
+        int w = (int)image.Width;
+        int h = (int)image.Height;
+
+        using var context = new SkiaBitmapExportContext(w, h, 1.0f);
+        ICanvas canvas = context.Canvas;
+
+        canvas.DrawImage(image, 0, 0, w, h);
+
+        float strokeSize = Math.Max(3f, w / 500f);
+        float radius = Math.Max(10f, w / 150f);
+        float crossLen = radius * 2.5f;
+
+        canvas.Antialias = true;
+        canvas.StrokeSize = strokeSize;
+
+        // Arrow line from start to end
+        canvas.StrokeColor = Color.FromArgb("#CC888888");
+        canvas.DrawLine((float)startX, (float)startY, (float)endX, (float)endY);
+
+        // Arrowhead at end
+        double angle = Math.Atan2(endY - startY, endX - startX);
+        float arrowLen = radius * 1.8f;
+        float arrowSpread = 0.45f;
+        canvas.StrokeColor = Color.FromArgb("#CCF0C040");
+        canvas.DrawLine(
+            (float)endX, (float)endY,
+            (float)(endX - arrowLen * Math.Cos(angle - arrowSpread)),
+            (float)(endY - arrowLen * Math.Sin(angle - arrowSpread)));
+        canvas.DrawLine(
+            (float)endX, (float)endY,
+            (float)(endX - arrowLen * Math.Cos(angle + arrowSpread)),
+            (float)(endY - arrowLen * Math.Sin(angle + arrowSpread)));
+
+        // Green crosshair — drag start
+        canvas.StrokeColor = Colors.Lime;
+        canvas.DrawCircle((float)startX, (float)startY, radius);
+        canvas.DrawLine((float)startX - crossLen, (float)startY, (float)startX + crossLen, (float)startY);
+        canvas.DrawLine((float)startX, (float)startY - crossLen, (float)startX, (float)startY + crossLen);
+
+        // Red crosshair — drag end
+        canvas.StrokeColor = Colors.Red;
+        canvas.DrawCircle((float)endX, (float)endY, radius);
+        canvas.DrawLine((float)endX - crossLen, (float)endY, (float)endX + crossLen, (float)endY);
+        canvas.DrawLine((float)endX, (float)endY - crossLen, (float)endX, (float)endY + crossLen);
+
+        using var ms = new MemoryStream();
+        context.WriteToStream(ms);
+        return ms.ToArray();
+    }
+
+
     /// <summary>Returns a copy of the grid image with a crosshair marker drawn at the parsed coordinate.</summary>
     private static byte[] CreateAnnotatedImage(
         byte[] gridImageBytes,

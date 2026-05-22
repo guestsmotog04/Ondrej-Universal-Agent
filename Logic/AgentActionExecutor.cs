@@ -322,6 +322,19 @@ public sealed class AgentActionExecutor(
         logger.LogInformation("Drag destination at ({X}, {Y}) for \"{Target}\".", endPx, endPy, destination);
         await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Destination Coordinates", Text: $"({endPx}, {endPy})")).ConfigureAwait(false);
 
+        // Emit a combined annotated screenshot showing both start (green) and end (red) crosshairs
+        if (debugLog is not null || onProgress is not null)
+        {
+            var (originX, originY) = screenProvider.GetVirtualScreenOrigin();
+            byte[] dragAnnotation = CoordinatePrompter.CreateAnnotatedImageDrag(
+                screenshot,
+                startPx - originX, startPy - originY,
+                endPx - originX, endPy - originY);
+            await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry(
+                "Drag: Start → End",
+                ImageBase64: Convert.ToBase64String(dragAnnotation))).ConfigureAwait(false);
+        }
+
         // Perform the drag
         string methodCalled = $"ClickDrag_MonitorCoords({startPx}, {startPy}, {endPx}, {endPy})";
         await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("OS Input Call", Text: methodCalled)).ConfigureAwait(false);
