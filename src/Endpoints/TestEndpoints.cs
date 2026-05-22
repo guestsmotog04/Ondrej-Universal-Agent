@@ -205,7 +205,7 @@ internal static class TestEndpoints
             TestCoordinatePromptRequest req,
             CoordinatePrompter defaultPrompter,
             IHttpClientFactory httpClientFactory,
-            IConfiguration config,
+            AppConfig appConfig,
             ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {
@@ -223,14 +223,11 @@ internal static class TestEndpoints
                 if (!string.IsNullOrWhiteSpace(req.ApiKey))
                 {
                     // TODO: Change the way default model is handled here instead of hard coding
-                    var model = string.IsNullOrWhiteSpace(req.Model) ? config["Gemini:Model"] ?? "gemini-2.0-flash" : req.Model;
-                    var overrideConfig = new ConfigurationBuilder()
-                        .AddInMemoryCollection(new Dictionary<string, string?>
-                        {
-                            ["Gemini:ApiKey"] = req.ApiKey,
-                            ["Gemini:Model"] = model
-                        })
-                        .Build();
+                    var overrideConfig = new AppConfig
+                    {
+                        GeminiApiKey = req.ApiKey,
+                        GeminiModel  = string.IsNullOrWhiteSpace(req.Model) ? appConfig.GeminiModel : req.Model
+                    };
                     var httpClient = httpClientFactory.CreateClient();
                     var logger = loggerFactory.CreateLogger<GeminiProvider>();
                     IAiProvider provider = new GeminiProvider(httpClient, overrideConfig, logger);

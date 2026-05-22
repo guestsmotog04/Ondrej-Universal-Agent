@@ -29,6 +29,7 @@ else
     throw new PlatformNotSupportedException("Unsupported operating system.");
 }
 
+builder.Services.AddSingleton<AppConfig>();
 builder.Services.AddHttpClient<IAiProvider, GeminiProvider>();
 builder.Services.AddTransient<CoordinatePrompter>();
 builder.Services.AddTransient<AgentActionExecutor>();

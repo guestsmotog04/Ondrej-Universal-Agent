@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Thio_Universal_Agent.AI_API;
 
@@ -15,7 +14,7 @@ public sealed class AgentLoop(
     IAiProvider aiProvider,
     IScreenProvider screenProvider,
     AgentActionExecutor executor,
-    IConfiguration configuration,
+    AppConfig appConfig,
     ILogger<AgentLoop> logger)
 {
     private const int MaxSteps = 50;
@@ -24,11 +23,9 @@ public sealed class AgentLoop(
     private const int ContextResetInterval = 8;
     private const string ScreenMimeType = "image/jpeg";
 
-    private readonly int _settleDelayMs =
-        int.TryParse(configuration["Agent:SettleDelayMs"], out var d) && d > 0 ? d : DefaultSettleDelayMs;
+    private readonly int _settleDelayMs = appConfig.AgentSettleDelayMs;
 
-    private readonly bool _enableContextReset =
-        !bool.TryParse(configuration["Agent:EnableContextReset"], out var r) || r;
+    private readonly bool _enableContextReset = appConfig.AgentEnableContextReset;
 
     /// <summary>
     /// Runs the agent loop to completion for the given session.

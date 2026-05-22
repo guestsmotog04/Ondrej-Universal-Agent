@@ -2,7 +2,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Thio_Universal_Agent.AI_API;
 
@@ -28,7 +27,7 @@ public enum GeminiThinkingLevel
 /// Gemini REST API implementation of <see cref="IAiProvider"/>.
 /// Communicates with the Gemini generateContent endpoint using <see cref="HttpClient"/>.
 /// </summary>
-public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configuration, ILogger<GeminiProvider> logger) : IAiProvider
+public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, ILogger<GeminiProvider> logger) : IAiProvider
 {
     private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -39,44 +38,41 @@ public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configu
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
     // Not validated here — the key may be absent at construction time and supplied later
-    // via the web UI (configuration["Gemini:ApiKey"] is set by the /api/agent/start endpoint).
+    // via the web UI (AppConfig.GeminiApiKey is set by the /api/agent/start endpoint).
     // Validation is deferred to SendRequestAsync so that constructing this type never throws.
-    private readonly string? _apiKey = configuration["Gemini:ApiKey"] is { } k && !string.IsNullOrWhiteSpace(k) ? k : null;
-    private readonly string _model = configuration["Gemini:Model"] ?? "gemini-2.0-flash"; //TODO: Remove hard coded model name
-    private readonly GeminiGenerationConfig? _generationConfig = BuildGenerationConfig(configuration, configuration["Gemini:Model"] ?? "gemini-2.0-flash"); //TODO: Remove hard coded model name
+    private readonly string? _apiKey = appConfig.GeminiApiKey;
+    private readonly string _model = appConfig.GeminiModel;
+    private readonly GeminiGenerationConfig? _generationConfig = BuildGenerationConfig(appConfig);
 
-    private static GeminiGenerationConfig? BuildGenerationConfig(IConfiguration configuration, string model)
+    private static GeminiGenerationConfig? BuildGenerationConfig(AppConfig appConfig)
     {
-        string? resString = null;
-        if (Enum.TryParse<GeminiMediaResolution>(configuration["Gemini:MediaResolution"], true, out var resolution)
-            && resolution is not GeminiMediaResolution.Unspecified)
-        {
-            resString = resolution switch
+        string? resString = appConfig.GeminiMediaResolution is not GeminiMediaResolution.Unspecified
+            ? appConfig.GeminiMediaResolution switch
             {
-                GeminiMediaResolution.Low => "MEDIA_RESOLUTION_LOW",
+                GeminiMediaResolution.Low    => "MEDIA_RESOLUTION_LOW",
                 GeminiMediaResolution.Medium => "MEDIA_RESOLUTION_MEDIUM",
-                GeminiMediaResolution.High => "MEDIA_RESOLUTION_HIGH",
-                _ => null
-            };
-        }
+                GeminiMediaResolution.High   => "MEDIA_RESOLUTION_HIGH",
+                _                            => null
+            }
+            : null;
 
-        float? temp = float.TryParse(configuration["Gemini:Temperature"], out var t) ? t : null;
-        float? topP = float.TryParse(configuration["Gemini:TopP"], out var p) ? p : null;
-        int? topK = int.TryParse(configuration["Gemini:TopK"], out var k) ? k : null;
-        int? maxTokens = int.TryParse(configuration["Gemini:MaxOutputTokens"], out var m) ? m : null;
+        float? temp      = appConfig.GeminiTemperature;
+        float? topP      = appConfig.GeminiTopP;
+        int?   topK      = appConfig.GeminiTopK;
+        int?   maxTokens = appConfig.GeminiMaxOutputTokens;
 
         GeminiThinkingConfig? thinkingConfig = null;
 
-        if (model.Contains("gemini-3", StringComparison.OrdinalIgnoreCase))
+        if (appConfig.GeminiModel.Contains("gemini-3", StringComparison.OrdinalIgnoreCase))
         {
-            string? thinkingLevel = configuration["Gemini:ThinkingLevel"]?.ToLower();
-            // Validate against GeminiThinkingLevel enum types
+            string? thinkingLevel = appConfig.GeminiThinkingLevel?.ToLower();
+            // Validate against GeminiThinkingLevel enum values
             if (!string.IsNullOrWhiteSpace(thinkingLevel) && Enum.TryParse<GeminiThinkingLevel>(thinkingLevel, true, out var level))
                 thinkingConfig = new GeminiThinkingConfig(null, level.ToString());
         }
         else
         {
-            if (int.TryParse(configuration["Gemini:ThinkingBudget"], out var tb))
+            if (appConfig.GeminiThinkingBudget is { } tb)
                 thinkingConfig = new GeminiThinkingConfig(tb, null);
         }
 
@@ -181,9 +177,9 @@ public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configu
 
     private async Task<AiResponse> SendRequestAsync(GeminiRequest request, CancellationToken cancellationToken, AiRequestOptions? options = null)
     {
-        // Re-read from configuration at call time so a key set after construction
+        // Re-read from AppConfig at call time so a key set after construction
         // (e.g. via the web UI /api/agent/start endpoint) is always picked up.
-        var apiKey = _apiKey ?? configuration["Gemini:ApiKey"];
+        var apiKey = _apiKey ?? appConfig.GeminiApiKey;
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new InvalidOperationException("Gemini:ApiKey is not configured. Provide an API key via the web UI.");
 
@@ -242,7 +238,7 @@ public sealed class GeminiProvider(HttpClient httpClient, IConfiguration configu
 
     private GeminiRequest BuildRequest(AiConversation conversation, AiChatMessage additionalMessage)
     {
-        bool stripHistoryImages = !bool.TryParse(configuration["Agent:StripHistoryImages"], out var s) || s;
+        bool stripHistoryImages = appConfig.AgentStripHistoryImages;
 
         var contents = new List<GeminiContent>(conversation.Messages.Count + 1);
 

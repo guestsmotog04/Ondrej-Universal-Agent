@@ -1,8 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc.ViewEngines;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Maui.Graphics;
-using Microsoft.Maui.Graphics.Skia;
-using SkiaSharp;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
@@ -30,17 +27,14 @@ public enum CoordinateMode
 }
 
 /// <summary> Locates UI elements on screen by iteratively prompting an AI model with grid-overlaid screenshots and refining coordinates through zoom. </summary>
-public sealed partial class CoordinatePrompter(IAiProvider aiProvider, IConfiguration configuration)
+public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig appConfig)
 {
     private readonly AiRequestOptions? _coordinateRequestOptions =
-        int.TryParse(configuration["Gemini:CoordinateMaxOutputTokens"], out var maxTokens)
+        appConfig.GeminiCoordinateMaxOutputTokens is { } maxTokens
             ? new AiRequestOptions(MaxOutputTokens: maxTokens)
             : null;
 
-    private readonly CoordinateMode _defaultCoordinateMode =
-        Enum.TryParse<CoordinateMode>(configuration["Agent:CoordinateMode"], ignoreCase: true, out var cfgMode)
-            ? cfgMode
-            : CoordinateMode.DirectAutoNormalize;
+    private readonly CoordinateMode _defaultCoordinateMode = appConfig.AgentCoordinateMode;
 
     private const int DefaultDivisions = 10;
     private const double DefaultConfidencePixels = 15.0;

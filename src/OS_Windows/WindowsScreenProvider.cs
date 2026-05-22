@@ -1,5 +1,4 @@
 ﻿// WindowsScreenProvider.cs
-using Microsoft.Extensions.Configuration;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -9,15 +8,14 @@ using System.Runtime.Versioning;
 namespace Thio_Universal_Agent.OS_Windows;
 
 [SupportedOSPlatform("windows")]
-public class WindowsScreenProvider(IConfiguration configuration) : IScreenProvider
+public class WindowsScreenProvider(AppConfig appConfig) : IScreenProvider
 {
     /// <summary>
     /// Returns the zero-based monitor index from config, or null for all-monitors mode.
-    /// Read fresh on every call so that per-session changes via <c>configuration["Agent:MonitorIndex"]</c>
+    /// Read fresh on every call so that per-session changes to <see cref="AppConfig.AgentMonitorIndex"/>
     /// take effect without a service restart.
     /// </summary>
-    private int? SelectedMonitorIndex =>
-        configuration.GetValue<int?>("Agent:MonitorIndex");
+    private int? SelectedMonitorIndex => appConfig.AgentMonitorIndex;
 
     public IReadOnlyList<MonitorInfo> GetMonitors()
     {

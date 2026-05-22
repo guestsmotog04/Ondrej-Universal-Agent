@@ -26,7 +26,7 @@ internal static class AgentEndpoints
             Results.Ok(screenProvider.GetMonitors()));
 
         // Start a new agent session
-        group.MapPost("/start", (AgentStartRequest req, AgentSessionManager manager, IConfiguration configuration) =>
+        group.MapPost("/start", (AgentStartRequest req, AgentSessionManager manager, AppConfig appConfig) =>
         {
             if (string.IsNullOrWhiteSpace(req.Goal))
                 return Results.BadRequest(new { error = "Goal is required." });
@@ -35,15 +35,13 @@ internal static class AgentEndpoints
                 return Results.BadRequest(new { error = "API key is required." });
 
             // Store the key so the next GeminiProvider instance picks it up
-            configuration["Gemini:ApiKey"] = req.ApiKey;
+            appConfig.GeminiApiKey = req.ApiKey;
 
             if (!string.IsNullOrWhiteSpace(req.Model))
-                configuration["Gemini:Model"] = req.Model;
+                appConfig.GeminiModel = req.Model;
 
             // Set or clear the monitor selection for this session
-            configuration["Agent:MonitorIndex"] = req.MonitorIndex.HasValue
-                ? req.MonitorIndex.Value.ToString()
-                : null;
+            appConfig.AgentMonitorIndex = req.MonitorIndex;
 
             string sessionId = manager.StartSession(req.Goal);
             return Results.Ok(new { sessionId });

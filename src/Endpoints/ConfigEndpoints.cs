@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+using Thio_Universal_Agent;
 
 namespace Thio_Universal_Agent.Endpoints;
 
@@ -10,25 +10,25 @@ internal static class ConfigEndpoints
 {
     internal static void MapConfigEndpoints(this WebApplication app)
     {
-        app.MapGet("/api/config", (IConfiguration cfg) =>
+        app.MapGet("/api/config", (AppConfig appConfig) =>
         {
             var response = new AppConfigResponse(
                 Agent: new AgentConfigDto(
-                        SettleDelayMs:       cfg.GetValue<int>("Agent:SettleDelayMs"),
-                        CoordinateMode:      cfg["Agent:CoordinateMode"],
-                        MonitorIndex:        cfg.GetValue<int?>("Agent:MonitorIndex"),
-                        EnableContextReset:  cfg.GetValue<bool?>("Agent:EnableContextReset") ?? true,
-                        StripHistoryImages:  cfg.GetValue<bool?>("Agent:StripHistoryImages") ?? true
+                        SettleDelayMs:       appConfig.AgentSettleDelayMs,
+                        CoordinateMode:      appConfig.AgentCoordinateMode.ToString(),
+                        MonitorIndex:        appConfig.AgentMonitorIndex,
+                        EnableContextReset:  appConfig.AgentEnableContextReset,
+                        StripHistoryImages:  appConfig.AgentStripHistoryImages
                     ),
                 Gemini: new GeminiConfigDto(
-                    Model:                    cfg["Gemini:Model"],
-                    MediaResolution:          cfg["Gemini:MediaResolution"],
-                    Temperature:              cfg.GetValue<double?>("Gemini:Temperature"),
-                    TopP:                     cfg.GetValue<double?>("Gemini:TopP"),
-                    TopK:                     cfg.GetValue<int?>("Gemini:TopK"),
-                    CoordinateMaxOutputTokens: cfg.GetValue<int?>("Gemini:CoordinateMaxOutputTokens"),
-                    ThinkingBudget:           cfg.GetValue<int?>("Gemini:ThinkingBudget"),
-                    ThinkingLevel:            cfg["Gemini:ThinkingLevel"]
+                    Model:                    appConfig.GeminiModel,
+                    MediaResolution:          appConfig.GeminiMediaResolution.ToString(),
+                    Temperature:              (double?)appConfig.GeminiTemperature,
+                    TopP:                     (double?)appConfig.GeminiTopP,
+                    TopK:                     appConfig.GeminiTopK,
+                    CoordinateMaxOutputTokens: appConfig.GeminiCoordinateMaxOutputTokens,
+                    ThinkingBudget:           appConfig.GeminiThinkingBudget,
+                    ThinkingLevel:            appConfig.GeminiThinkingLevel
                 )
             );
 
