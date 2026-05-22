@@ -68,6 +68,10 @@ internal static class AgentEndpoints
                 latestResult = latest?.Result.Summary,
                 finalResult = session.FinalResult,
                 startedAt = session.StartedAt,
+                completedAt = session.CompletedAt,
+                totalDurationMs = session.CompletedAt.HasValue
+                    ? (long)(session.CompletedAt.Value - session.StartedAt).TotalMilliseconds
+                    : (long?)(null),
             });
         });
 
@@ -86,6 +90,7 @@ internal static class AgentEndpoints
                 result = s.Result.Summary,
                 s.Result.Success,
                 s.Timestamp,
+                s.DurationMs,
             });
 
             return Results.Ok(steps);
@@ -266,6 +271,7 @@ internal static class AgentEndpoints
             step.Result.IsTerminal,
             step.Result.GoalAchieved,
             step.Timestamp,
+            step.DurationMs,
             debugLog = step.DebugLog?.Select(e => new { e.Label, e.Text, e.ImageBase64 }),
         };
 
@@ -293,6 +299,9 @@ internal static class AgentEndpoints
             type = "done",
             status = session.Status.ToString(),
             finalResult = session.FinalResult,
+            totalDurationMs = session.CompletedAt.HasValue
+                ? (long)(session.CompletedAt.Value - session.StartedAt).TotalMilliseconds
+                : (long?)(null),
         };
 
         string json = JsonSerializer.Serialize(payload, JsonOptions);

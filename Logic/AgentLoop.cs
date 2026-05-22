@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Thio_Universal_Agent.AI_API;
@@ -85,6 +86,7 @@ public sealed class AgentLoop(
                 }
 
                 // Parse the AI's response (with retries on malformed output)
+                var stepStopwatch = Stopwatch.StartNew();
                 AgentParsedResponse? parsed = await TryParseWithRetriesAsync(
                     conversation, response.Text, ct, debugLog).ConfigureAwait(false);
 
@@ -99,7 +101,7 @@ public sealed class AgentLoop(
                     {
                         var failAction = new AgentAction(AgentActionKind.Fail, Reason: "Unparseable AI response");
                         var failResult = new ActionExecutionResult(false, "Parse failed after retries.", IsTerminal: true, GoalAchieved: false);
-                        var failStep = new AgentStep(step, "(parse failure)", failAction, failResult, DateTimeOffset.UtcNow, debugLog);
+                        var failStep = new AgentStep(step, "(parse failure)", failAction, failResult, DateTimeOffset.UtcNow, stepStopwatch.ElapsedMilliseconds, debugLog);
                         session.Steps.Add(failStep);
                         await session.RaiseStepCompletedAsync(failStep).ConfigureAwait(false);
                     }
@@ -131,8 +133,11 @@ public sealed class AgentLoop(
                 if (debugging)
                     debugLog!.Add(new AgentDebugEntry("Execution Result", Text: $"Success={result.Success} | {result.Summary}"));
 
+                stepStopwatch.Stop();
+
                 // Record the step
                 var agentStep = new AgentStep(step, parsed.Thought, parsed.Action, result, DateTimeOffset.UtcNow,
+                    stepStopwatch.ElapsedMilliseconds,
                     debugLog is { Count: > 0 } ? debugLog : null);
                 session.Steps.Add(agentStep);
                 await session.RaiseStepCompletedAsync(agentStep).ConfigureAwait(false);

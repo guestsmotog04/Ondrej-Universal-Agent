@@ -46,6 +46,9 @@ public sealed class AgentSession
     /// <summary>When the session was created.</summary>
     public DateTimeOffset StartedAt { get; } = DateTimeOffset.UtcNow;
 
+    /// <summary>When the session fully terminated (set by <see cref="SignalTerminated"/>).</summary>
+    public DateTimeOffset? CompletedAt { get; private set; }
+
     /// <summary>Cancellation source that the user or timeout logic can trigger.</summary>
     public CancellationTokenSource Cts { get; } = new();
 
@@ -156,5 +159,9 @@ public sealed class AgentSession
     public Task Terminated => _terminated.Task;
 
     /// <summary>Called by <see cref="AgentLoop"/> once the loop exits to unblock any SSE stream waiters.</summary>
-    internal void SignalTerminated() => _terminated.TrySetResult();
+    internal void SignalTerminated()
+    {
+        CompletedAt = DateTimeOffset.UtcNow;
+        _terminated.TrySetResult();
+    }
 }

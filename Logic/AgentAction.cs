@@ -162,6 +162,7 @@ public sealed record AgentSubStep(int StepNumber, AgentDebugEntry Entry);
 /// <param name="Action">The tool invocation that was executed.</param>
 /// <param name="Result">Outcome of the execution.</param>
 /// <param name="Timestamp">When this step completed.</param>
+/// <param name="DurationMs">Wall-clock milliseconds from parse-start to execution-end for this step.</param>
 /// <param name="DebugLog">Verbose debug entries for this step (only when testing is enabled).</param>
 public sealed record AgentStep(
     int StepNumber,
@@ -169,4 +170,5 @@ public sealed record AgentStep(
     AgentAction Action,
     ActionExecutionResult Result,
     DateTimeOffset Timestamp,
+    long DurationMs,
     IReadOnlyList<AgentDebugEntry>? DebugLog = null);

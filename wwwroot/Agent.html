@@ -324,33 +324,51 @@
 
         /* ---- Final Result Banner ---- */
         .final-result {
-            padding: 16px 20px;
+            padding: 14px 20px;
             border-radius: 6px;
             margin-bottom: 16px;
             font-size: 14px;
             font-weight: 600;
             display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
         }
 
         .final-result.completed {
             background: #1a2e1a;
             border: 1px solid #2c7a2c;
             color: #55cc77;
-            display: block;
+            display: flex;
         }
 
         .final-result.failed, .final-result.error {
             background: #2e1a1a;
             border: 1px solid #8a2020;
             color: #cc5555;
-            display: block;
+            display: flex;
         }
 
         .final-result.cancelled {
             background: #2e2a1a;
             border: 1px solid #8a7020;
             color: #ccaa55;
-            display: block;
+            display: flex;
+        }
+
+        .final-result-msg {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .final-result-time {
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            opacity: 0.85;
         }
 
         /* ---- Debug Panel ---- */
@@ -495,6 +513,22 @@
             margin-left: 8px;
             vertical-align: middle;
         }
+
+        .step-duration {
+            font-size: 10px;
+            font-weight: 600;
+            color: #4a7a4a;
+            margin-left: 8px;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+        }
+
+        #elapsed-timer {
+            margin-left: auto;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 12px;
+            color: #4a6a8a;
+            letter-spacing: 0.5px;
+        }
     </style>
 </head>
 <body>
@@ -518,6 +552,7 @@
     <div class="status-dot idle" id="status-dot"></div>
     <span id="status-text">Idle</span>
     <span id="step-counter"></span>
+    <span id="elapsed-timer"></span>
 </div>
 
 <div class="prompt-banner" id="prompt-banner" style="display:none;">
@@ -528,7 +563,7 @@
 </div>
 
 <main>
-    <div class="final-result" id="final-result"></div>
+    <div class="final-result" id="final-result"><span class="final-result-msg" id="final-result-msg"></span><span class="final-result-time" id="final-result-time"></span></div>
 
     <div class="current-step" id="current-step">
         <h2>Current Step</h2>
@@ -554,6 +589,8 @@
     const statusText = document.getElementById('status-text');
     const stepCounter = document.getElementById('step-counter');
     const finalResultEl = document.getElementById('final-result');
+    const finalResultMsg = document.getElementById('final-result-msg');
+    const finalResultTime = document.getElementById('final-result-time');
     const currentThought = document.getElementById('current-thought');
     const currentAction = document.getElementById('current-action');
     const currentResult = document.getElementById('current-result');
@@ -562,6 +599,7 @@
     const promptBanner = document.getElementById('prompt-banner');
     const promptPreview = document.getElementById('prompt-preview');
     const promptFull = document.getElementById('prompt-full');
+    const elapsedTimer = document.getElementById('elapsed-timer');
 
     let sessionId = null;
     let eventSource = null;
@@ -570,6 +608,8 @@
     let sessionGoal = '';
     let sessionFinalResult = '';
     let isPaused = false;
+    let sessionStartTime = null;
+    let elapsedIntervalId = null;
 
     // Restore API key from localStorage
     apiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
@@ -645,13 +685,20 @@
         sessionGoal = goal;
         sessionFinalResult = '';
         isPaused = false;
+        sessionStartTime = Date.now();
+        elapsedTimer.textContent = '0:00';
+        clearInterval(elapsedIntervalId);
+        elapsedIntervalId = setInterval(() => {
+            elapsedTimer.textContent = formatElapsed(Date.now() - sessionStartTime);
+        }, 500);
         stepLog.innerHTML = '';
         promptPreview.textContent = goal.length > 80 ? goal.slice(0, 80) + '…' : goal;
         promptFull.textContent = goal;
         promptBanner.style.display = '';
         document.getElementById('prompt-details').removeAttribute('open');
         finalResultEl.className = 'final-result';
-        finalResultEl.textContent = '';
+        finalResultMsg.textContent = '';
+        finalResultTime.textContent = '';
         finalResultEl.style.display = 'none';
         currentThought.textContent = 'Starting...';
         currentAction.style.display = 'none';
@@ -816,6 +863,7 @@
         let html = `
             <span class="step-num">#${msg.stepNumber}</span>
             <span class="step-action">${escapeHtml(msg.action)}</span>
+            <span class="step-duration">${formatDuration(msg.durationMs)}</span>
             <div class="step-thought">${escapeHtml(msg.thought)}</div>
             <div class="step-result">${escapeHtml(msg.result)}</div>
         `;
@@ -840,6 +888,7 @@
             sessionFinalResult = msg.result;
             setStatus(status, msg.goalAchieved ? 'Completed' : 'Failed');
             showFinalResult(status, msg.result);
+            stopElapsedTimer(null);
             cleanup();
         }
     }
@@ -871,6 +920,7 @@
         if (msg.finalResult) sessionFinalResult = msg.finalResult;
         setStatus(statusKey, msg.status);
         if (msg.finalResult) showFinalResult(statusKey, msg.finalResult);
+        stopElapsedTimer(msg.totalDurationMs);
         cleanup();
     }
 
@@ -888,6 +938,7 @@
                     thought: s.thought,
                     action: s.action,
                     result: s.result,
+                    durationMs: s.durationMs,
                 };
                 if (s.isTerminal) step.isTerminal = true;
                 if (s.goalAchieved != null) step.goalAchieved = s.goalAchieved;
@@ -919,6 +970,33 @@
         setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
     }
 
+    function stopElapsedTimer(totalDurationMs) {
+        clearInterval(elapsedIntervalId);
+        elapsedIntervalId = null;
+        const finalMs = totalDurationMs != null ? totalDurationMs
+            : sessionStartTime ? Date.now() - sessionStartTime : null;
+        if (finalMs != null) {
+            elapsedTimer.textContent = formatElapsed(finalMs);
+            finalResultTime.textContent = formatElapsed(finalMs);
+        }
+    }
+
+    function formatElapsed(ms) {
+        if (ms == null) return '';
+        const totalSec = Math.floor(ms / 1000);
+        const h = Math.floor(totalSec / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        return `${m}:${String(s).padStart(2,'0')}`;
+    }
+
+    function formatDuration(ms) {
+        if (ms == null) return '';
+        if (ms < 1000) return `${ms}ms`;
+        return `${(ms / 1000).toFixed(1)}s`;
+    }
+
     function setStatus(key, label) {
         statusDot.className = 'status-dot ' + key;
         statusText.textContent = label;
@@ -926,8 +1004,9 @@
 
     function showFinalResult(statusKey, message) {
         finalResultEl.className = 'final-result ' + statusKey;
-        finalResultEl.textContent = message;
-        finalResultEl.style.display = 'block';
+        finalResultMsg.textContent = message;
+        finalResultTime.textContent = '';
+        finalResultEl.style.display = 'flex';
     }
 
     function cleanup() {
