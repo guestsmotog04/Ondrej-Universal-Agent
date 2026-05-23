@@ -9,7 +9,7 @@ namespace Thio_Universal_Agent.Logic;
 /// Executes a single <see cref="AgentAction"/> by dispatching to the appropriate <see cref="IInputProvider"/> or <see cref="CoordinatePrompter"/> methods.
 /// When <see cref="Globals.ENABLE_TESTING"/> is true, captures detailed debug entries including coordinate resolution steps.
 /// </summary>
-public sealed class AgentActionExecutor(
+public sealed partial class AgentActionExecutor(
     IInputProvider inputProvider,
     IScreenProvider screenProvider,
     CoordinatePrompter coordinatePrompter,
@@ -74,7 +74,7 @@ public sealed class AgentActionExecutor(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to execute {ActionKind}.", action.Kind);
+            LogFailedToExecute(logger, ex, action.Kind);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Execution Exception", Text: ex.ToString())).ConfigureAwait(false);
             var errorResult = new ActionExecutionResult(false, $"Execution error: {ex.Message}", IsTerminal: false, GoalAchieved: false);
             return debugLog is { Count: > 0 } ? errorResult with { DebugEntries = debugLog } : errorResult;
@@ -96,7 +96,7 @@ public sealed class AgentActionExecutor(
         if (action.AltMode == AgentActionAltMode.CurrentCursorPosition)
         {
             var (curX, curY) = inputProvider.GetCursorPosition();
-            logger.LogInformation("{ActionKind} at current cursor position ({X}, {Y}).", action.Kind, curX, curY);
+            LogActionAtCursorPosition(logger, action.Kind, curX, curY);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Current Cursor Position", Text: $"({curX}, {curY})")).ConfigureAwait(false);
 
             if (debugLog is not null || onProgress is not null)
@@ -155,7 +155,7 @@ public sealed class AgentActionExecutor(
                 await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Annotated Screenshot", ImageBase64: Convert.ToBase64String(screenshot.Annotated))).ConfigureAwait(false);
             }
 
-            logger.LogInformation("{ActionKind} at exact coordinates ({X}, {Y}).", action.Kind, coord.AbsoluteX, coord.AbsoluteY);
+            LogActionAtExactCoords(logger, action.Kind, coord.AbsoluteX, coord.AbsoluteY);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Exact Coordinates", Text: coord.ToString())).ConfigureAwait(false);
 
             string exactMethodCalled;
@@ -198,7 +198,7 @@ public sealed class AgentActionExecutor(
         // If we need to resolve the coordinates from natural language description
         else
         {
-            logger.LogInformation("Resolving coordinates for: \"{Target}\"", target);
+            LogResolvingCoordinates(logger, target);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Coordinate Resolution", Text: $"Resolving target: \"{target}\"")).ConfigureAwait(false);
 
             // When testing, capture every intermediate CoordinatePrompter step
@@ -234,7 +234,7 @@ public sealed class AgentActionExecutor(
                 .ConfigureAwait(false);
             coordSw.Stop();
 
-            logger.LogInformation("{ActionKind} at ({X}, {Y}) for \"{Target}\".", action.Kind, coord.AbsoluteX, coord.AbsoluteY, target);
+            LogActionAtResolvedCoords(logger, action.Kind, coord.AbsoluteX, coord.AbsoluteY, target);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Final Resolved Coordinates", Text: coord.ToString())).ConfigureAwait(false);
 
             string methodCalled;
@@ -292,7 +292,7 @@ public sealed class AgentActionExecutor(
         string destination = action.DragTarget ?? throw new InvalidOperationException("ClickDrag requires a DragTarget (destination).");
 
         // Resolve source coordinates
-        logger.LogInformation("Resolving drag source coordinates for: \"{Target}\"", source);
+        LogResolvingDragSource(logger, source);
         await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Source Resolution", Text: $"Resolving source: \"{source}\"")).ConfigureAwait(false);
 
         int startPx, startPy, endPx, endPy;
@@ -344,11 +344,11 @@ public sealed class AgentActionExecutor(
             startPx = startCoordAi.AbsoluteX;
             startPy = startCoordAi.AbsoluteY;
 
-            logger.LogInformation("Drag source at ({X}, {Y}) for \"{Target}\".", startPx, startPy, source);
+            LogDragSourceCoords(logger, startPx, startPy, source);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Source Coordinates", Text: startCoordAi.ToString())).ConfigureAwait(false);
 
             // Resolve destination coordinates
-            logger.LogInformation("Resolving drag destination coordinates for: \"{Target}\"", destination);
+            LogResolvingDragDestination(logger, destination);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Destination Resolution", Text: $"Resolving destination: \"{destination}\"")).ConfigureAwait(false);
 
             (endCoordAi, endCoordMs) = await ResolveTargetCoordinatesAsync(screenshot, destination, cancellationToken, debugLog, onProgress)
@@ -359,7 +359,7 @@ public sealed class AgentActionExecutor(
             totalCoordMs = startCoordMs + endCoordMs;
         }
 
-        logger.LogInformation("Drag destination at ({X}, {Y}) for \"{Target}\".", endPx, endPy, destination);
+        LogDragDestinationCoords(logger, endPx, endPy, destination);
         await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Destination Coordinates", Text: endCoordAi?.ToString() ?? $"({endPx}, {endPy})")).ConfigureAwait(false);
 
         // Emit a combined annotated screenshot showing both start (green) and end (red) crosshairs
@@ -433,7 +433,7 @@ public sealed class AgentActionExecutor(
     {
         string text = action.Text ?? throw new InvalidOperationException("TypeText requires Text.");
 
-        logger.LogInformation("Typing text: \"{Text}\"", text);
+        LogTypingText(logger, text);
         await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("OS Input Call", Text: $"TypeTextAsync(\"{text}\")")).ConfigureAwait(false);
 
         await inputProvider.TypeTextAsync(text).ConfigureAwait(false);
@@ -453,7 +453,7 @@ public sealed class AgentActionExecutor(
         bool alt   = action.Modifiers.HasFlag(ModifierKeys.Alt);
         bool win   = action.Modifiers.HasFlag(ModifierKeys.Win);
 
-        logger.LogInformation("Key combo: {Key} (ctrl={Ctrl}, shift={Shift}, alt={Alt}, win={Win}).", key ?? "[None]", ctrl, shift, alt, win);
+        LogKeyCombo(logger, key ?? "[None]", ctrl, shift, alt, win);
         await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("OS Input Call",
             Text: $"SendModKeyComboAsync(\"{key??"[None]"}\", ctrl={ctrl}, shift={shift}, alt={alt}, win={win})")).ConfigureAwait(false);
 
@@ -465,7 +465,7 @@ public sealed class AgentActionExecutor(
 
     private async Task<ActionExecutionResult> ExecuteScrollAsync(AgentAction action, List<AgentDebugEntry>? debugLog, Func<AgentDebugEntry, Task>? onProgress = null)
     {
-        logger.LogInformation("{Kind} by {Amount}.", action.Kind, action.Amount);
+        LogScroll(logger, action.Kind, action.Amount);
         await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("OS Input Call",
             Text: $"{(action.Kind == AgentActionKind.ScrollUp ? "ScrollUp" : "ScrollDown")}({action.Amount})")).ConfigureAwait(false);
 
@@ -507,4 +507,40 @@ public sealed class AgentActionExecutor(
         parts.Add(key.ToUpperInvariant());
         return string.Join('+', parts);
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to execute {ActionKind}.")]
+    private static partial void LogFailedToExecute(ILogger logger, Exception ex, AgentActionKind actionKind);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{ActionKind} at current cursor position ({X}, {Y}).")]
+    private static partial void LogActionAtCursorPosition(ILogger logger, AgentActionKind actionKind, int x, int y);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{ActionKind} at exact coordinates ({X}, {Y}).")]
+    private static partial void LogActionAtExactCoords(ILogger logger, AgentActionKind actionKind, int x, int y);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Resolving coordinates for: \"{Target}\"")]
+    private static partial void LogResolvingCoordinates(ILogger logger, string target);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{ActionKind} at ({X}, {Y}) for \"{Target}\".")]
+    private static partial void LogActionAtResolvedCoords(ILogger logger, AgentActionKind actionKind, int x, int y, string target);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Resolving drag source coordinates for: \"{Target}\"")]
+    private static partial void LogResolvingDragSource(ILogger logger, string target);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Drag source at ({X}, {Y}) for \"{Target}\".")]
+    private static partial void LogDragSourceCoords(ILogger logger, int x, int y, string target);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Resolving drag destination coordinates for: \"{Target}\"")]
+    private static partial void LogResolvingDragDestination(ILogger logger, string target);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Drag destination at ({X}, {Y}) for \"{Target}\".")]
+    private static partial void LogDragDestinationCoords(ILogger logger, int x, int y, string target);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Typing text: \"{Text}\"")]
+    private static partial void LogTypingText(ILogger logger, string text);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Key combo: {Key} (ctrl={Ctrl}, shift={Shift}, alt={Alt}, win={Win}).")]
+    private static partial void LogKeyCombo(ILogger logger, string key, bool ctrl, bool shift, bool alt, bool win);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{Kind} by {Amount}.")]
+    private static partial void LogScroll(ILogger logger, AgentActionKind kind, int amount);
 }

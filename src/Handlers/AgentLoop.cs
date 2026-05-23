@@ -9,7 +9,7 @@ namespace Thio_Universal_Agent.Logic;
 /// and repeats until the goal is achieved, the agent fails, or the session is cancelled.
 /// When <see cref="Globals.ENABLE_TESTING"/> is true, captures verbose debug entries at every stage.
 /// </summary>
-public sealed class AgentLoop(
+public sealed partial class AgentLoop(
     IAiProvider aiProvider,
     IScreenProvider screenProvider,
     AgentActionExecutor executor,
@@ -46,7 +46,7 @@ public sealed class AgentLoop(
             string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(session.Goal);
             var conversation = new AiConversation();
 
-            logger.LogInformation("Agent session {SessionId} started. Goal: \"{Goal}\".", session.SessionId, session.Goal);
+            LogSessionStarted(logger, session.SessionId, session.Goal);
 
             var initialAiSw = Stopwatch.StartNew();
             AiResponse response = await aiProvider.ContinueConversationAsync(conversation, systemPrompt, screenshot.Processed, ScreenMimeType, ct)
@@ -57,7 +57,7 @@ public sealed class AgentLoop(
             {
                 session.Status = AgentSessionStatus.Error;
                 session.FinalResult = $"AI request failed on initial prompt: {response.ErrorMessage}";
-                logger.LogError("Initial AI call failed for session {SessionId}: {Error}", session.SessionId, response.ErrorMessage);
+                LogInitialAiFailed(logger, session.SessionId, response.ErrorMessage);
                 return;
             }
 
@@ -104,7 +104,7 @@ public sealed class AgentLoop(
                 {
                     session.Status = AgentSessionStatus.Failed;
                     session.FinalResult = "Agent produced unparseable responses after retries.";
-                    logger.LogWarning("Session {SessionId} failed: repeated parse failures.", session.SessionId);
+                    LogParseFailures(logger, session.SessionId);
 
                     // Record a debug-only step so the UI shows what happened
                     if (debugLog is { Count: > 0 })
@@ -121,9 +121,7 @@ public sealed class AgentLoop(
                 if (debugging)
                     debugLog!.Add(new AgentDebugEntry("Parse Result", Text: $"Success → {parsed.Action.Kind}: {FormatActionDetail(parsed.Action)}"));
 
-                logger.LogInformation(
-                    "Step {Step}: THOUGHT: {Thought} | ACTION: {ActionKind} {ActionDetail}",
-                    step, parsed.Thought, parsed.Action.Kind, FormatActionDetail(parsed.Action));
+                LogStepAction(logger, step, parsed.Thought, parsed.Action.Kind, FormatActionDetail(parsed.Action));
 
                 // Notify the UI immediately so it can show what the agent is about to do
                 // before potentially slow work (e.g. coordinate resolution) begins.
@@ -169,7 +167,7 @@ public sealed class AgentLoop(
                 {
                     session.Status = result.GoalAchieved ? AgentSessionStatus.Completed : AgentSessionStatus.Failed;
                     session.FinalResult = result.Summary;
-                    logger.LogInformation("Session {SessionId} terminated at step {Step}: {Summary}", session.SessionId, step, result.Summary);
+                    LogSessionTerminated(logger, session.SessionId, step, result.Summary);
                     return;
                 }
 
@@ -204,7 +202,7 @@ public sealed class AgentLoop(
                 {
                     session.Status = AgentSessionStatus.Error;
                     session.FinalResult = $"AI request failed at step {step}: {response.ErrorMessage}";
-                    logger.LogError("AI call failed at step {Step} for session {SessionId}: {Error}", step, session.SessionId, response.ErrorMessage);
+                    LogAiCallFailed(logger, step, session.SessionId, response.ErrorMessage);
                     return;
                 }
 
@@ -221,19 +219,19 @@ public sealed class AgentLoop(
             // Exceeded max steps
             session.Status = AgentSessionStatus.Failed;
             session.FinalResult = $"Exceeded maximum of {MaxSteps} steps without completing the goal.";
-            logger.LogWarning("Session {SessionId} exceeded max steps ({MaxSteps}).", session.SessionId, MaxSteps);
+            LogMaxStepsExceeded(logger, session.SessionId, MaxSteps);
         }
         catch (OperationCanceledException)
         {
             session.Status = AgentSessionStatus.Cancelled;
             session.FinalResult = "Session was cancelled.";
-            logger.LogInformation("Session {SessionId} was cancelled.", session.SessionId);
+            LogSessionCancelled(logger, session.SessionId);
         }
         catch (Exception ex)
         {
             session.Status = AgentSessionStatus.Error;
             session.FinalResult = $"Unexpected error: {ex.Message}";
-            logger.LogError(ex, "Unexpected error in session {SessionId}.", session.SessionId);
+            LogUnexpectedError(logger, ex, session.SessionId);
         }
         finally
         {
@@ -254,7 +252,7 @@ public sealed class AgentLoop(
             if (AgentActionParser.TryParse(responseText, out AgentParsedResponse? parsed, out string? error))
                 return parsed;
 
-            logger.LogWarning("Parse attempt {Attempt} failed: {Error}", attempt + 1, error);
+            LogParseAttemptFailed(logger, attempt + 1, error);
             debugLog?.Add(new AgentDebugEntry($"Parse Attempt {attempt + 1} Failed", Text: error));
 
             if (attempt == MaxParseRetries)
@@ -270,7 +268,7 @@ public sealed class AgentLoop(
 
             if (!retryResponse.Success)
             {
-                logger.LogError("AI correction call failed: {Error}", retryResponse.ErrorMessage);
+                LogCorrectionAiFailed(logger, retryResponse.ErrorMessage);
                 debugLog?.Add(new AgentDebugEntry("Parse Correction AI Error", Text: retryResponse.ErrorMessage ?? "Unknown error"));
                 break;
             }
@@ -301,7 +299,7 @@ public sealed class AgentLoop(
         if (!result.Success && action.Target is not null)
         {
             // Coordinate resolution failed — tell the AI so it can adapt
-            logger.LogWarning("Target resolution failed for \"{Target}\": {Summary}", action.Target, result.Summary);
+            LogTargetResolutionFailed(logger, action.Target, result.Summary);
 
             string recovery = AgentPromptBuilder.BuildTargetNotFoundPrompt(action.Target);
             var recoveryEntry = new AgentDebugEntry("Target Not Found — Recovery Prompt", Text: recovery);
@@ -326,7 +324,7 @@ public sealed class AgentLoop(
         AiConversation oldConversation, string goal, Screenshot latestScreenshot, CancellationToken ct,
         List<AgentDebugEntry>? debugLog = null)
     {
-        logger.LogInformation("Performing episodic context reset.");
+        LogContextReset(logger);
         debugLog?.Add(new AgentDebugEntry("Context Reset", Text: "Initiating episodic context reset to reduce token usage."));
 
         // Ask the AI to summarize
@@ -354,7 +352,7 @@ public sealed class AgentLoop(
 
         if (!resetResponse.Success)
         {
-            logger.LogWarning("Context reset AI call failed: {Error}. Continuing with old context.", resetResponse.ErrorMessage);
+            LogContextResetFailed(logger, resetResponse.ErrorMessage);
             debugLog?.Add(new AgentDebugEntry("Context Reset — Failed", Text: resetResponse.ErrorMessage ?? "Unknown error"));
         }
         else
@@ -364,6 +362,48 @@ public sealed class AgentLoop(
 
         return resetResponse.Success ? newConversation : oldConversation;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Agent session {SessionId} started. Goal: \"{Goal}\".")]
+    private static partial void LogSessionStarted(ILogger logger, string sessionId, string goal);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Initial AI call failed for session {SessionId}: {Error}")]
+    private static partial void LogInitialAiFailed(ILogger logger, string sessionId, string? error);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session {SessionId} failed: repeated parse failures.")]
+    private static partial void LogParseFailures(ILogger logger, string sessionId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Step {Step}: THOUGHT: {Thought} | ACTION: {ActionKind} {ActionDetail}")]
+    private static partial void LogStepAction(ILogger logger, int step, string thought, AgentActionKind actionKind, string actionDetail);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Session {SessionId} terminated at step {Step}: {Summary}")]
+    private static partial void LogSessionTerminated(ILogger logger, string sessionId, int step, string summary);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "AI call failed at step {Step} for session {SessionId}: {Error}")]
+    private static partial void LogAiCallFailed(ILogger logger, int step, string sessionId, string? error);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session {SessionId} exceeded max steps ({MaxSteps}).")]
+    private static partial void LogMaxStepsExceeded(ILogger logger, string sessionId, int maxSteps);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Session {SessionId} was cancelled.")]
+    private static partial void LogSessionCancelled(ILogger logger, string sessionId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Unexpected error in session {SessionId}.")]
+    private static partial void LogUnexpectedError(ILogger logger, Exception ex, string sessionId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Parse attempt {Attempt} failed: {Error}")]
+    private static partial void LogParseAttemptFailed(ILogger logger, int attempt, string? error);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "AI correction call failed: {Error}")]
+    private static partial void LogCorrectionAiFailed(ILogger logger, string? error);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Target resolution failed for \"{Target}\": {Summary}")]
+    private static partial void LogTargetResolutionFailed(ILogger logger, string? target, string summary);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Performing episodic context reset.")]
+    private static partial void LogContextReset(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Context reset AI call failed: {Error}. Continuing with old context.")]
+    private static partial void LogContextResetFailed(ILogger logger, string? error);
 
     private static string FormatActionDetail(AgentAction action) => action.Kind switch
     {
