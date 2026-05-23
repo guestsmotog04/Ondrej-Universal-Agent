@@ -31,8 +31,9 @@ public static class AgentActionParser
         }
 
         // Detect which keyword comes first: ACTION: or QUEUE:
-        int actionIndex = responseText.IndexOf(ActionPrefix, StringComparison.OrdinalIgnoreCase);
-        int queueIndex  = responseText.IndexOf(QueuePrefix,  StringComparison.OrdinalIgnoreCase);
+        // Only match when the keyword appears at the very start of a line (ignoring leading whitespace).
+        int actionIndex = IndexOfLineStart(responseText, ActionPrefix);
+        int queueIndex  = IndexOfLineStart(responseText, QueuePrefix);
 
         bool hasQueue  = queueIndex  >= 0 && (actionIndex < 0 || queueIndex < actionIndex);
         bool hasAction = actionIndex >= 0 && !hasQueue;
@@ -580,6 +581,42 @@ public static class AgentActionParser
         error = null;
         action = new AgentAction(AgentActionKind.Wait, Amount: seconds);
         return true;
+    }
+
+    /// <summary>
+    /// Returns the index of the first occurrence of <paramref name="keyword"/> that starts at the
+    /// beginning of a line (after optional whitespace), or -1 if not found.
+    /// This prevents matching keywords embedded inside prose (e.g. "previous action:").
+    /// </summary>
+    private static int IndexOfLineStart(string text, string keyword)
+    {
+        int searchFrom = 0;
+        while (true)
+        {
+            int idx = text.IndexOf(keyword, searchFrom, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0) return -1;
+
+            // Walk back to find the start of this line
+            int lineStart = idx;
+            while (lineStart > 0 && text[lineStart - 1] != '\n' && text[lineStart - 1] != '\r')
+                lineStart--;
+
+            // Only leading whitespace is allowed before the keyword on this line
+            bool onlyWhitespaceBefore = true;
+            for (int i = lineStart; i < idx; i++)
+            {
+                if (!char.IsWhiteSpace(text[i]))
+                {
+                    onlyWhitespaceBefore = false;
+                    break;
+                }
+            }
+
+            if (onlyWhitespaceBefore)
+                return idx;
+
+            searchFrom = idx + keyword.Length;
+        }
     }
 
     /// <summary>Strips optional surrounding double-quotes from a string.</summary>
