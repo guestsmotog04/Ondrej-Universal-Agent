@@ -22,13 +22,6 @@ public sealed partial class CoordinatePrompter
         return ((int)image.Width, (int)image.Height);
     }
 
-    /// <summary>Creates a <see cref="ViewRegion"/> covering the full source image.</summary>
-    private static ViewRegion CreateFullView(IImage source)
-    {
-        return new ViewRegion(0, 0, source.Width, source.Height);
-    }
-
-
     /// <summary>
     /// Produces the full-image grid overlay PNG from raw screenshot bytes with no AI calls or zooming.
     /// Used by the test endpoint to preview what the first-iteration grid image looks like.
@@ -36,8 +29,8 @@ public sealed partial class CoordinatePrompter
     public static byte[] CreateFullGridOverlayImage(byte[] screenshotBytes)
     {
         ArgumentNullException.ThrowIfNull(screenshotBytes);
-        using IImage source = LoadImage(screenshotBytes);
-        ViewRegion view = CreateFullView(source);
+        using SkiaImage source = LoadImage(screenshotBytes);
+        ViewRegion view = new ViewRegion(source);
         return CreateGridOverlayImage(source, view, Screenshot.DefaultDivisions, Screenshot.DefaultDivisions, gridAxisMaxValue: Screenshot.DefaultNormalized, noOuterBorder: true);
     }
 
@@ -206,7 +199,7 @@ public sealed partial class CoordinatePrompter
     {
         int rulerOffset = ComputeRulerOffset(imageWidth, Math.Max(cols, rows));
 
-        using IImage gridImage = LoadImage(gridImageBytes);
+        using SkiaImage gridImage = LoadImage(gridImageBytes);
         int w = (int)gridImage.Width;
         int h = (int)gridImage.Height;
 

@@ -135,7 +135,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         int stepNumber = 0;
 
         using Microsoft.Maui.Graphics.Skia.SkiaImage source = LoadImage(screenshot.Processed);
-        ViewRegion view = CreateFullView(source);
+        ViewRegion view = new ViewRegion(source);
         int imageWidth = (int)source.Width;
         int imageHeight = (int)source.Height;
 
