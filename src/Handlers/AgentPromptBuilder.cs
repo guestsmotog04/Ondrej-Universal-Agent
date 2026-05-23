@@ -95,11 +95,11 @@ public static class AgentPromptBuilder
             You MUST respond in EXACTLY one of these two formats every single time:
 
             Format A — single action:
-            THOUGHT: <your reasoning about what you see on screen and what to do next>
+            REASON: <your reason / intention for the action taken>
             ACTION: <exactly one tool call from the list above>
 
             Format B — queued actions (up to {maxQueueSize}):
-            THOUGHT: <your reasoning about what you see on screen and what to do next>
+            REASON: <your reason / intention for the action taken>
             QUEUE:
             <tool call 1>
             <tool call 2>
@@ -179,11 +179,11 @@ public static class AgentPromptBuilder
             Please respond in one of these EXACT formats:
 
             Format A (single action):
-            THOUGHT: <reasoning>
+            REASON: <brief reasoning max 1 sentence>
             ACTION: <one tool call>
 
             Format B (queued actions):
-            THOUGHT: <reasoning>
+            REASON: <brief reasoning max 1 sentence>
             QUEUE:
             <tool call 1>
             <tool call 2>

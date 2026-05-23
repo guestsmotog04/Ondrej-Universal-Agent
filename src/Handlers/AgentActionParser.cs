@@ -12,7 +12,7 @@ namespace Thio_Universal_Agent.Handlers;
 /// </summary>
 public static class AgentActionParser
 {
-    private const string ThoughtPrefix = "THOUGHT:";
+    private const string ThoughtPrefix = "REASON:";
     private const string ActionPrefix = "ACTION:";
     private const string QueuePrefix = "QUEUE:";
 
