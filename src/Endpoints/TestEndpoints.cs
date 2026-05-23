@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Thio_Universal_Agent;
 using Thio_Universal_Agent.AI_API.Gemini;
 using Thio_Universal_Agent.Logic;
 
@@ -240,13 +241,14 @@ internal static class TestEndpoints
                 }
 
                 byte[] screenshotBytes = Convert.FromBase64String(req.ScreenshotBase64);
+                var screenshot = new Screenshot(screenshotBytes);
                 CoordinateMode? coordinateMode = Enum.TryParse<CoordinateMode>(req.Mode, ignoreCase: true, out var parsedMode)
                     ? parsedMode
                     : null;
                 var steps = new List<object>();
 
-                var (x, y, normX, normY) = await prompter.GetCoordinatesForItemAsync(
-                    screenshotBytes,
+                ScreenCoordinate result = await prompter.GetCoordinatesForItemAsync(
+                    screenshot,
                     req.ItemToIdentify,
                     mode: coordinateMode,
                     onStepCompleted: step =>
@@ -264,7 +266,7 @@ internal static class TestEndpoints
                     },
                     cancellationToken: ct);
 
-                return Results.Ok(new { Steps = steps, FinalScreenX = x, FinalScreenY = y, FinalNormX = normX, FinalNormY = normY });
+                return Results.Ok(new { Steps = steps, FinalScreenX = result.AbsoluteX, FinalScreenY = result.AbsoluteY, FinalNormX = result.NormalizedX, FinalNormY = result.NormalizedY });
             }
             catch (Exception ex)
             {

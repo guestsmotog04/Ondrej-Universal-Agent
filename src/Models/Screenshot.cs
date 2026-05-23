@@ -1,3 +1,5 @@
+using SkiaSharp;
+
 namespace Thio_Universal_Agent;
 
 /// <summary>
@@ -49,6 +51,23 @@ public sealed class Screenshot
         OriginY   = originY;
         Width     = width;
         Height    = height;
+    }
+
+    /// <summary>
+    /// Convenience constructor for cases where only raw bytes are available and no
+    /// virtual-desktop origin is known (e.g. a screenshot uploaded by a client).
+    /// Origin defaults to (0, 0) and dimensions are read from the image data.
+    /// </summary>
+    /// <param name="bytes">Raw image bytes (PNG, JPEG, etc.).</param>
+    public Screenshot(byte[] bytes)
+    {
+        using SKBitmap bmp = SKBitmap.Decode(bytes);
+        Original  = bytes;
+        Processed = bytes;
+        OriginX   = 0;
+        OriginY   = 0;
+        Width     = bmp.Width;
+        Height    = bmp.Height;
     }
 
     /// <summary>
