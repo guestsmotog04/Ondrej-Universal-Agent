@@ -139,6 +139,34 @@
             background-color: transparent;
             border-color: #333;
         }
+
+        /* ---- Warning banner ---- */
+        #warning-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 14px 40px;
+            background-color: #1f1100;
+            border-bottom: 1px solid #5c3600;
+            font-size: 13px;
+            color: #cc8800;
+            line-height: 1.6;
+        }
+
+        #warning-banner .warning-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        #warning-banner strong {
+            color: #ffaa22;
+        }
+
+        #warning-banner ul {
+            margin: 4px 0 0 16px;
+            color: #aa7700;
+        }
     </style>
 </head>
 <body>
@@ -151,6 +179,19 @@
     <div id="status-bar">
         <span class="status-dot"></span>
         <span>Server online</span>
+    </div>
+
+    <div id="warning-banner">
+        <span class="warning-icon">⚠️</span>
+        <div>
+            <strong>Prototype software — not intended for production use.</strong>
+            <ul>
+                <li>No authentication or access control is implemented. Anyone who can reach this server can control your machine.</li>
+                <li><strong>Do not expose this server to the internet</strong> or any untrusted network.</li>
+                <li>The agent executes real OS-level input (mouse, keyboard) on the host machine — supervise it at all times.</li>
+                <li>Use only in a controlled local environment.</li>
+            </ul>
+        </div>
     </div>
 
     <main>
