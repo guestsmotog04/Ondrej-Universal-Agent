@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace Thio_Universal_Agent.Logic;
+namespace Thio_Universal_Agent.Handlers;
 
 /// <summary>
 /// Parses the AI model's raw text response into a structured <see cref="AgentParsedResponse"/>.

@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Thio_Universal_Agent.Handlers;
 
-namespace Thio_Universal_Agent.Logic;
+namespace Thio_Universal_Agent;
 
 /// <summary>
 /// The core observe-think-act loop that drives an autonomous agent session.

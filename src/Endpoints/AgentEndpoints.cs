@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Thio_Universal_Agent.Logic;
+using Thio_Universal_Agent;
 
 namespace Thio_Universal_Agent.Endpoints;
 

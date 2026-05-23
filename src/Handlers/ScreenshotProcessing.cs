@@ -3,7 +3,7 @@ using Microsoft.Maui.Graphics.Skia;
 using SkiaSharp;
 using System.Globalization;
 
-namespace Thio_Universal_Agent.Logic;
+namespace Thio_Universal_Agent;
 
 public sealed partial class CoordinatePrompter
 {

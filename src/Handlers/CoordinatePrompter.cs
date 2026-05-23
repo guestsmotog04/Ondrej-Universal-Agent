@@ -2,7 +2,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace Thio_Universal_Agent.Logic;
+namespace Thio_Universal_Agent;
 
 /// <summary>Determines how <see cref="CoordinatePrompter"/> locates a UI element.</summary>
 public enum CoordinateMode

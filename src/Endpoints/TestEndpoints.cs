@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Thio_Universal_Agent.AI_API.Gemini;
-using Thio_Universal_Agent.Logic;
 
 namespace Thio_Universal_Agent.Endpoints;
 

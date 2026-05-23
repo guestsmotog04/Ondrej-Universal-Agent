@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 
-namespace Thio_Universal_Agent.Logic;
+namespace Thio_Universal_Agent;
 
 /// <summary>
 /// Executes a single <see cref="AgentAction"/> by dispatching to the appropriate <see cref="IInputProvider"/> or <see cref="CoordinatePrompter"/> methods.

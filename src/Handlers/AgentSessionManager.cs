@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace Thio_Universal_Agent.Logic;
+namespace Thio_Universal_Agent;
 
 /// <summary>
 /// Singleton service that manages active <see cref="AgentSession"/> instances.
