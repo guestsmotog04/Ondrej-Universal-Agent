@@ -1,4 +1,6 @@
-﻿namespace Thio_Universal_Agent;
+﻿using Thio_Universal_Agent.AI_API.Gemini;
+
+namespace Thio_Universal_Agent;
 
 // ── Provider config interface ─────────────────────────────────────────────────
 

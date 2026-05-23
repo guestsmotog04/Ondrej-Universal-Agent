@@ -1,4 +1,6 @@
-namespace Thio_Universal_Agent.Logic;
+using Thio_Universal_Agent.Logic;
+
+namespace Thio_Universal_Agent;
 
 /// <summary>Tracks the lifecycle status of an agent session.</summary>
 public enum AgentSessionStatus

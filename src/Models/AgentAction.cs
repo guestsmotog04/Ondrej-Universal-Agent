@@ -1,4 +1,4 @@
-namespace Thio_Universal_Agent.Logic;
+namespace Thio_Universal_Agent;
 
 /// <summary>Enumerates every tool the AI agent can invoke.</summary>
 public enum AgentActionKind
