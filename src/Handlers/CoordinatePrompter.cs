@@ -291,8 +291,9 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
             CoordinateMode.DirectAutoNormalize => await GetCoordinatesDirectAsync(
                 screenshot, itemToIdentify, onStepCompleted, cancellationToken,
                 useNormalization: true,
-                normalizedWidth: 1000,
-                normalizedHeight: 1000).ConfigureAwait(false),
+                normalizedWidth: Screenshot.NormalizedDimension,
+                normalizedHeight: Screenshot.NormalizedDimension
+                ).ConfigureAwait(false),
 
             CoordinateMode.Zoom => await GetCoordinatesZoomAsync(
                 screenshot, itemToIdentify, onStepCompleted, cancellationToken).ConfigureAwait(false),

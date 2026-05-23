@@ -10,6 +10,8 @@ namespace Thio_Universal_Agent;
 /// </summary>
 public sealed class Screenshot
 {
+    public static readonly int NormalizedDimension = 1000;
+
     /// <summary>Raw captured bytes before any overlay or processing is applied.</summary>
     public byte[] Original { get; }
 

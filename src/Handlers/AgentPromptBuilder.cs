@@ -19,6 +19,7 @@ public static class AgentPromptBuilder
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(goal);
         string systemInfo = "Basic System Info:\n" + BuildSystemInfoString();
+        string normDim = Screenshot.NormalizedDimension.ToString();
 
         return $"""
             You are an autonomous computer agent. You control a real desktop computer by looking at screenshots and issuing actions. You have NO access to terminals, APIs, or code — only visual perception and the tools listed below.
@@ -96,7 +97,7 @@ public static class AgentPromptBuilder
             8. Use DONE only when the screen visually confirms the goal is complete.
             9. If you are stuck after several attempts, use FAIL with a clear explanation.
             10. When describing a target, use language only (not coordinates), unless a tool has a COORDS mode you are using.
-            11. If using a tool's COORDS mode (if available), give the coordinates normalized within 1000x1000 coordinates regardless of original aspect ratio or resolution. The true coordinates will be automatically calculated from this.
+            11. If using a tool's COORDS mode (if available), give the coordinates normalized within {normDim}x{normDim} coordinates regardless of original aspect ratio or resolution. The true coordinates will be automatically calculated from this.
             12. Always visually confirm the action was taken to ensure it worked is possible. For example, the computer may have missed the action and it needs to be repeated.
             13. Prefer the use of COORDS mode for tools where available. If it repeatly fails to hit the correction location, try using natural language.
 
