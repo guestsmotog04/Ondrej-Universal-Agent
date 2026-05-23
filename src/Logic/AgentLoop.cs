@@ -40,7 +40,7 @@ public sealed class AgentLoop(
 
         try
         {
-            byte[] screenshot = screenProvider.CaptureScreen();
+            var (screenshot, originX, originY) = screenProvider.CaptureScreen();
             //TODO: Add a config for whether to add grid overlay to regular conversation screenshots. For now default to true
             screenshot = coordinatePrompter.CreateFullGridOverlayImage(screenshot);
 
@@ -143,7 +143,7 @@ public sealed class AgentLoop(
                 // Execute the action (executor adds its own debug entries)
                 var executeSw = Stopwatch.StartNew();
                 ActionExecutionResult result = await ExecuteWithTargetRecoveryAsync(
-                    parsed.Action, screenshot, conversation, ct, debugLog, executorProgress).ConfigureAwait(false);
+                    parsed.Action, screenshot, originX, originY, conversation, ct, debugLog, executorProgress).ConfigureAwait(false);
                 executeSw.Stop();
 
                 if (debugging)
@@ -184,7 +184,7 @@ public sealed class AgentLoop(
                 await session.WaitIfPausedAsync(ct).ConfigureAwait(false);
 
                 // Observe: take a new screenshot
-                screenshot = screenProvider.CaptureScreen();
+                (screenshot, originX, originY) = screenProvider.CaptureScreen();
                 screenshot = coordinatePrompter.CreateFullGridOverlayImage(screenshot);
 
                 // Episodic context reset to prevent payload bloat
@@ -288,11 +288,11 @@ public sealed class AgentLoop(
     /// fails to locate the target, reports the failure back to the AI instead of crashing.
     /// </summary>
     private async Task<ActionExecutionResult> ExecuteWithTargetRecoveryAsync(
-        AgentAction action, byte[] screenshot, AiConversation conversation, CancellationToken ct,
+        AgentAction action, byte[] screenshot, int originX, int originY, AiConversation conversation, CancellationToken ct,
         List<AgentDebugEntry>? debugLog = null, Func<AgentDebugEntry, Task>? onProgress = null)
     {
         ActionExecutionResult result = await executor
-            .ExecuteAsync(action, screenshot, ct, onProgress)
+            .ExecuteAsync(action, screenshot, originX, originY, ct, onProgress)
             .ConfigureAwait(false);
 
         // Merge executor's debug entries into our step log

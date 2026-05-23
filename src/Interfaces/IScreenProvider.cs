@@ -14,17 +14,24 @@ public sealed record MonitorInfo(int Index, int X, int Y, int Width, int Height,
 public interface IScreenProvider
 {
     /// <summary>
-    /// Captures the screen area determined by the current configuration.
+    /// Captures the screen area determined by the current configuration and simultaneously
+    /// records the virtual-desktop origin of the captured area in a single
+    /// <c>GetCaptureRect</c> call, guaranteeing the image bytes and coordinate offset
+    /// correspond to the same monitor.
     /// When <c>Agent:MonitorIndex</c> is set, only that monitor is captured;
     /// otherwise the full virtual screen (all monitors) is captured.
     /// </summary>
-    byte[] CaptureScreen();
+    (byte[] Screenshot, int OriginX, int OriginY) CaptureScreen();
 
     /// <summary>
     /// Returns the top-left corner of the captured area in virtual-desktop coordinates.
     /// For a full virtual-screen capture this may be negative on multi-monitor setups.
     /// For a single-monitor capture this is the monitor's position in the virtual desktop.
-    /// This offset must be added to image-pixel coordinates before calling OS input APIs.
+    /// <para>
+    /// Prefer using the <c>OriginX</c>/<c>OriginY</c> values returned by
+    /// <see cref="CaptureScreen"/> so the origin is always derived from the same
+    /// <c>GetCaptureRect</c> call as the screenshot it accompanies.
+    /// </para>
     /// </summary>
     (int X, int Y) GetVirtualScreenOrigin() => (0, 0);
 

@@ -41,7 +41,7 @@ internal static class TestEndpoints
 
             try
             {
-                byte[] imageBytes = screenProvider.CaptureScreen();
+                byte[] imageBytes = screenProvider.CaptureScreen().Screenshot;
                 return Results.File(imageBytes, "image/jpeg");
             }
             catch (Exception ex)

@@ -26,6 +26,8 @@ public sealed class AgentActionExecutor(
     public async Task<ActionExecutionResult> ExecuteAsync(
         AgentAction action,
         byte[] currentScreenshot,
+        int originX,
+        int originY,
         CancellationToken cancellationToken = default,
         Func<AgentDebugEntry, Task>? onProgress = null)
     {
@@ -40,10 +42,10 @@ public sealed class AgentActionExecutor(
             {
                 AgentActionKind.LeftClick or AgentActionKind.RightClick or AgentActionKind.DoubleClick or AgentActionKind.MiddleClick or AgentActionKind.MoveMouse or
                 AgentActionKind.LeftClickCoords or AgentActionKind.RightClickCoords or AgentActionKind.DoubleClickCoords or AgentActionKind.MiddleClickCoords or AgentActionKind.MoveMouseCoords
-                    => await ExecuteClickAsync(action, currentScreenshot, cancellationToken, debugLog, onProgress).ConfigureAwait(false),
+                    => await ExecuteClickAsync(action, currentScreenshot, originX, originY, cancellationToken, debugLog, onProgress).ConfigureAwait(false),
 
                 AgentActionKind.ClickDrag or AgentActionKind.ClickDragCoords
-                    => await ExecuteClickDragAsync(action, currentScreenshot, cancellationToken, debugLog, onProgress).ConfigureAwait(false),
+                    => await ExecuteClickDragAsync(action, currentScreenshot, originX, originY, cancellationToken, debugLog, onProgress).ConfigureAwait(false),
 
                 AgentActionKind.TypeText 
                     => await ExecuteTypeTextAsync(action, debugLog, onProgress).ConfigureAwait(false),
@@ -84,7 +86,9 @@ public sealed class AgentActionExecutor(
     /// <summary>Resolves the target to coordinates, then dispatches to the correct click/move method.</summary>
     private async Task<ActionExecutionResult> ExecuteClickAsync(
         AgentAction action, 
-        byte[] screenshot, 
+        byte[] screenshot,
+        int originX,
+        int originY,
         CancellationToken cancellationToken,
         List<AgentDebugEntry>? debugLog, 
         Func<AgentDebugEntry, Task>? onProgress = null
@@ -149,17 +153,13 @@ public sealed class AgentActionExecutor(
         // If exact coordinates were supplied directly, parse and dispatch without AI resolution.
         else if (action.AltMode == AgentActionAltMode.ExactCoords)
         {
-            (int px, int py) = CoordinatePrompter.ParseAndNormalizeCoords(target, screenshot, screenProvider);
+            (int px, int py) = CoordinatePrompter.ParseAndNormalizeCoords(target, screenshot, originX, originY);
 
             if (debugLog is not null || onProgress is not null)
             {
                 byte[] annotation = CoordinatePrompter.CreateAnnotatedImageDirect(screenshot, px, py);
                 await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Annotated Screenshot", ImageBase64: Convert.ToBase64String(annotation))).ConfigureAwait(false);
             }
-
-            var (originX, originY) = screenProvider.GetVirtualScreenOrigin();
-            px = px + originX;
-            py = py + originY;
 
             logger.LogInformation("{ActionKind} at exact coordinates ({X}, {Y}).", action.Kind, px, py);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Exact Coordinates", Text: $"({px}, {py})")).ConfigureAwait(false);
@@ -244,7 +244,6 @@ public sealed class AgentActionExecutor(
             // Shift image-pixel coordinates to absolute screen coordinates.
             // On multi-monitor setups the virtual screen may start at a negative offset
             // (e.g. a secondary monitor positioned to the left of the primary).
-            var (originX, originY) = screenProvider.GetVirtualScreenOrigin();
             int px = (int)Math.Round(x) + originX;
             int py = (int)Math.Round(y) + originY;
 
@@ -299,7 +298,9 @@ public sealed class AgentActionExecutor(
     /// <summary>Resolves source and destination targets to coordinates, then performs a click-drag.</summary>
     private async Task<ActionExecutionResult> ExecuteClickDragAsync(
         AgentAction action, 
-        byte[] screenshot, 
+        byte[] screenshot,
+        int originX,
+        int originY,
         CancellationToken cancellationToken,
         List<AgentDebugEntry>? debugLog,
         Func<AgentDebugEntry, Task>? onProgress = null
@@ -332,7 +333,7 @@ public sealed class AgentActionExecutor(
             }
             else
             {
-                (startPx, startPy) = CoordinatePrompter.ParseAndNormalizeCoords(source, screenshot, screenProvider);
+                (startPx, startPy) = CoordinatePrompter.ParseAndNormalizeCoords(source, screenshot, originX, originY);
             }
 
             // Resolve end point
@@ -346,12 +347,12 @@ public sealed class AgentActionExecutor(
             }
             else
             {
-                (endPx, endPy) = CoordinatePrompter.ParseAndNormalizeCoords(destination, screenshot, screenProvider);
+                (endPx, endPy) = CoordinatePrompter.ParseAndNormalizeCoords(destination, screenshot, originX, originY);
             }
         }
         else
         {
-            (startPx, startPy, startCoordMs) = await ResolveTargetCoordinatesAsync(screenshot, source, cancellationToken, debugLog, onProgress)
+            (startPx, startPy, startCoordMs) = await ResolveTargetCoordinatesAsync(screenshot, originX, originY, source, cancellationToken, debugLog, onProgress)
                 .ConfigureAwait(false);
 
             logger.LogInformation("Drag source at ({X}, {Y}) for \"{Target}\".", startPx, startPy, source);
@@ -361,7 +362,7 @@ public sealed class AgentActionExecutor(
             logger.LogInformation("Resolving drag destination coordinates for: \"{Target}\"", destination);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Destination Resolution", Text: $"Resolving destination: \"{destination}\"")).ConfigureAwait(false);
 
-            (endPx, endPy, endCoordMs) = await ResolveTargetCoordinatesAsync(screenshot, destination, cancellationToken, debugLog, onProgress)
+            (endPx, endPy, endCoordMs) = await ResolveTargetCoordinatesAsync(screenshot, originX, originY, destination, cancellationToken, debugLog, onProgress)
                 .ConfigureAwait(false);
 
             totalCoordMs = startCoordMs + endCoordMs;
@@ -373,7 +374,6 @@ public sealed class AgentActionExecutor(
         // Emit a combined annotated screenshot showing both start (green) and end (red) crosshairs
         if (debugLog is not null || onProgress is not null)
         {
-            var (originX, originY) = screenProvider.GetVirtualScreenOrigin();
             byte[] dragAnnotation = CoordinatePrompter.CreateAnnotatedImageDrag(
                 screenshot,
                 startPx - originX, startPy - originY,
@@ -396,7 +396,7 @@ public sealed class AgentActionExecutor(
 
     /// <summary>Resolves a target description to absolute screen coordinates using the coordinate prompter.</summary>
     private async Task<(int px, int py, long coordMs)> ResolveTargetCoordinatesAsync(
-        byte[] screenshot, string target, CancellationToken cancellationToken,
+        byte[] screenshot, int originX, int originY, string target, CancellationToken cancellationToken,
         List<AgentDebugEntry>? debugLog, Func<AgentDebugEntry, Task>? onProgress = null)
     {
         Func<CoordinatePrompter.CoordinateStep, Task>? onCoordStep = null;
@@ -431,7 +431,6 @@ public sealed class AgentActionExecutor(
             .ConfigureAwait(false);
         coordSw.Stop();
 
-        var (originX, originY) = screenProvider.GetVirtualScreenOrigin();
         int px = (int)Math.Round(x) + originX;
         int py = (int)Math.Round(y) + originY;
 

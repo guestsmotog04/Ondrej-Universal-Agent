@@ -72,13 +72,15 @@ public class WindowsScreenProvider(AppConfig appConfig) : IScreenProvider
         );
     }
 
-    public byte[] CaptureScreen()
+    public (byte[] Screenshot, int OriginX, int OriginY) CaptureScreen()
     {
         // Temporarily set thread to be DPI aware to get physical pixels instead of scaled logical pixels
         IntPtr previousDpiContext = NativeMethods.SetThreadDpiAwarenessContext((IntPtr)(-4));
 
         try
         {
+            // Single GetCaptureRect call so the screenshot bytes and origin are guaranteed
+            // to correspond to the same monitor enumeration result.
             var (x, y, width, height) = GetCaptureRect();
 
             IntPtr hdc = NativeMethods.GetDC(IntPtr.Zero);
@@ -115,7 +117,7 @@ public class WindowsScreenProvider(AppConfig appConfig) : IScreenProvider
                 using MemoryStream ms = new MemoryStream();
                 // Saving as JPEG for faster web transmission, though PNG could be used for lossless
                 bmp.Save(ms, ImageFormat.Jpeg);
-                return ms.ToArray();
+                return (ms.ToArray(), x, y);
             }
             finally
             {
