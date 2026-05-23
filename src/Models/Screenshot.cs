@@ -10,7 +10,9 @@ namespace Thio_Universal_Agent;
 /// </summary>
 public sealed class Screenshot
 {
-    public static readonly int NormalizedDimension = 1000;
+    public const int DefaultNormalized = 1000;
+    public const int DefaultDivisions = 10;
+
 
     /// <summary>Raw captured bytes before any overlay or processing is applied.</summary>
     public byte[] Original { get; }

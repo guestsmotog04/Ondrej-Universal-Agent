@@ -41,7 +41,7 @@ public sealed class AgentLoop(
         {
             var screenshot = screenProvider.CaptureScreen();
             //TODO: Add a config for whether to add grid overlay to regular conversation screenshots. For now default to true
-            screenshot.Processed = coordinatePrompter.CreateFullGridOverlayImage(screenshot.Original);
+            screenshot.Processed = CoordinatePrompter.CreateFullGridOverlayImage(screenshot.Original);
 
             string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(session.Goal);
             var conversation = new AiConversation();
@@ -184,7 +184,7 @@ public sealed class AgentLoop(
 
                 // Observe: take a new screenshot
                 screenshot = screenProvider.CaptureScreen();
-                screenshot.Processed = coordinatePrompter.CreateFullGridOverlayImage(screenshot.Original);
+                screenshot.Processed = CoordinatePrompter.CreateFullGridOverlayImage(screenshot.Original);
 
                 // Episodic context reset to prevent payload bloat
                 if (_enableContextReset && step % ContextResetInterval == 0)

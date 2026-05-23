@@ -190,7 +190,7 @@ internal static class TestEndpoints
                 if (req.Screenshot is not { } screenshot)
                     return Results.Problem("Screenshot image is required.");
 
-                byte[] gridImageBytes = prompter.CreateFullGridOverlayImage(screenshot.Original);
+                byte[] gridImageBytes = CoordinatePrompter.CreateFullGridOverlayImage(screenshot.Original);
                 return Results.File(gridImageBytes, "image/png");
             }
             catch (Exception ex)

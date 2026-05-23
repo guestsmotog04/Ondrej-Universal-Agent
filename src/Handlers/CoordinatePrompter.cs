@@ -35,13 +35,10 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
 
     private readonly CoordinateMode _defaultCoordinateMode = appConfig.Agent.CoordinateMode;
 
-    private const int DefaultDivisions = 10;
     private const double DefaultConfidencePixels = 15.0;
     private const int MaxZoomIterations = 10;
     private const double DefaultAIEstimatePrecision = 0.3; // Assume AI is accurate within ~0.3 of a grid cell
     private const int MinZoomResolution = 1920; // Upscale zoomed grid images so the longer side is at least this many pixels
-
-    private readonly int _divisions = DefaultDivisions;
 
     // Commands / codes that can be used by the AI finding the coordinates
     public sealed record CoordResponseCode
@@ -130,7 +127,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         CancellationToken cancellationToken = default
         )
     {
-        int divisions = _divisions; // Maybe later add a config for this, or a way to set the variable
+        int divisions = Screenshot.DefaultDivisions; // Maybe later add a config for this, or a way to set the variable
         int stepNumber = 0;
 
         using IImage source = LoadImage(screenshot.Processed);
@@ -202,7 +199,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
 
         if (onStepCompleted is not null)
         {
-            byte[] annotated = CreateAnnotatedImage(gridImage, coordinate, imageWidth, imageHeight, divisions, divisions);
+            byte[] annotated = CreateAnnotatedImage_NormalizedCoords(gridImage, coordinate, imageWidth, imageHeight, divisions, divisions);
             await onStepCompleted(new CoordinateStep(
                 stepNumber, gridImage, response.Text, coordinate.X, coordinate.Y, annotated))
                 .ConfigureAwait(false);
@@ -241,7 +238,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
             {
                 (int renderedW, int renderedH) = ComputeRenderedSize((int)view.Width, (int)view.Height, MinZoomResolution);
                 byte[] annotated = parsed is not null
-                    ? CreateAnnotatedImage(zoomedImage, parsed, renderedW, renderedH, divisions, divisions)
+                    ? CreateAnnotatedImage_NormalizedCoords(zoomedImage, parsed, renderedW, renderedH, divisions, divisions)
                     : zoomedImage;
                 await onStepCompleted(new CoordinateStep(
                     stepNumber, zoomedImage, response.Text, parsed?.X, parsed?.Y, annotated))
@@ -291,8 +288,8 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
             CoordinateMode.DirectAutoNormalize => await GetCoordinatesDirectAsync(
                 screenshot, itemToIdentify, onStepCompleted, cancellationToken,
                 useNormalization: true,
-                normalizedWidth: Screenshot.NormalizedDimension,
-                normalizedHeight: Screenshot.NormalizedDimension
+                normalizedWidth: Screenshot.DefaultNormalized,
+                normalizedHeight: Screenshot.DefaultNormalized
                 ).ConfigureAwait(false),
 
             CoordinateMode.Zoom => await GetCoordinatesZoomAsync(
@@ -370,7 +367,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
 
         if (onStepCompleted is not null)
         {
-            byte[] annotated = CreateAnnotatedImageDirect(screenshot.Processed, coordinate.X, coordinate.Y);
+            byte[] annotated = CreateAnnotatedImage_PixelCoords(screenshot.Processed, coordinate.X, coordinate.Y);
             await onStepCompleted(new CoordinateStep(1, screenshot.Processed, response.Text, coordinate.X, coordinate.Y, annotated))
                 .ConfigureAwait(false);
         }
@@ -389,7 +386,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
     }
 
     /// <summary>Builds the prompt text that asks the LLM to identify grid coordinates.</summary>
-    private static string MakeCoordinatePrompt(string itemToIdentify, int divisions = DefaultDivisions)
+    private static string MakeCoordinatePrompt(string itemToIdentify, int divisions = Screenshot.DefaultDivisions)
     {
         return $"Return the X, Y grid coordinates closest to the item with the following description in the given screenshot: {itemToIdentify}.\n\n"
              + $"\nIf you can identify the item, output, respond with {CoordResponseCode.COORDS} then the comma sparated X,Y coordinates. Each coordinate must be between 0 and {divisions}, and contain a single decimal."
@@ -473,7 +470,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
                         recoveryInstructions = "None of the valid response codes were found in the response. Must use exactly one of the following response codes: " + string.Join(", ", CoordResponseCode.AllCodeStrings);
                         break;
                     case ParseFailReasons.InvalidCoordinates:
-                        recoveryInstructions = "The coordinates you provided are outside the bounds of the grid. Please provide coordinates where both X and Y are between 0 and " + DefaultDivisions + ", with a single decimal place.";
+                        recoveryInstructions = "The coordinates you provided are outside the bounds of the grid. Please provide coordinates where both X and Y are between 0 and " + Screenshot.DefaultDivisions + ", with a single decimal place.";
                         break;
                     default:
                         recoveryInstructions = "Please review the parsing error details and adjust your response accordingly.";
@@ -616,7 +613,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         if (foundCommand.IsStandalone)
             recoveryInstructions += $"just the command alone with no additional text.";
         else
-            recoveryInstructions += $"'{foundCommand} X, Y' where X and Y are numbers between 0 and {DefaultDivisions} with a single decimal place, separated by a comma.";
+            recoveryInstructions += $"'{foundCommand} X, Y' where X and Y are numbers between 0 and {Screenshot.DefaultDivisions} with a single decimal place, separated by a comma.";
 
         return (
             coordinates: null,
@@ -683,7 +680,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
 
     private static bool CheckCoordinatesWithinBounds(GridCoordinate coordinates)
     {
-        if (coordinates.X < 0 || coordinates.X > DefaultDivisions || coordinates.Y < 0 || coordinates.Y > DefaultDivisions)
+        if (coordinates.X < 0 || coordinates.X > Screenshot.DefaultDivisions || coordinates.Y < 0 || coordinates.Y > Screenshot.DefaultDivisions)
             return false;
         else
             return true;
@@ -693,8 +690,8 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
     private static (double ScreenX, double ScreenY) CalculateScreenCoordinates(
         ViewRegion currentView,
         GridCoordinate coordinate,
-        int cols = DefaultDivisions,
-        int rows = DefaultDivisions)
+        int cols = Screenshot.DefaultDivisions,
+        int rows = Screenshot.DefaultDivisions)
     {
         double screenX = currentView.X + (coordinate.X / cols) * currentView.Width;
         double screenY = currentView.Y + (coordinate.Y / rows) * currentView.Height;

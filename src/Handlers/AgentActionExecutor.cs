@@ -102,7 +102,7 @@ public sealed class AgentActionExecutor(
             if (debugLog is not null || onProgress is not null)
             {
                 var (imgX, imgY) = screenshot.ToImageRelative(curX, curY);
-                screenshot.Annotated = CoordinatePrompter.CreateAnnotatedImageDirect(screenshot.Processed, imgX, imgY);
+                screenshot.Annotated = CoordinatePrompter.CreateAnnotatedImage_PixelCoords(screenshot.Processed, imgX, imgY);
                 await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Annotated Screenshot", ImageBase64: Convert.ToBase64String(screenshot.Annotated))).ConfigureAwait(false);
             }
 
@@ -151,7 +151,7 @@ public sealed class AgentActionExecutor(
 
             if (debugLog is not null || onProgress is not null)
             {
-                screenshot.Annotated = CoordinatePrompter.CreateAnnotatedImageDirect(screenshot.Processed, coord.ImageX, coord.ImageY);
+                screenshot.Annotated = CoordinatePrompter.CreateAnnotatedImage_PixelCoords(screenshot.Processed, coord.ImageX, coord.ImageY);
                 await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Annotated Screenshot", ImageBase64: Convert.ToBase64String(screenshot.Annotated))).ConfigureAwait(false);
             }
 

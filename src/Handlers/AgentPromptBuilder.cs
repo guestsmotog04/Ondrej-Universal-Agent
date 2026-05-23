@@ -19,7 +19,7 @@ public static class AgentPromptBuilder
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(goal);
         string systemInfo = "Basic System Info:\n" + BuildSystemInfoString();
-        string normDim = Screenshot.NormalizedDimension.ToString();
+        string normDim = Screenshot.DefaultNormalized.ToString();
 
         return $"""
             You are an autonomous computer agent. You control a real desktop computer by looking at screenshots and issuing actions. You have NO access to terminals, APIs, or code — only visual perception and the tools listed below.

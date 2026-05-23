@@ -61,13 +61,13 @@ public sealed class ScreenCoordinate(int AbsoluteX, int AbsoluteY, Screenshot Sc
     /// X position normalised to a 0–1000 scale across the width of the captured screenshot.
     /// Matches the coordinate space used by the AI and <see cref="CoordinatePrompter"/>.
     /// </summary>
-    public double NormalizedX => Screenshot.Width  == 0 ? 0 : (double)ImageX / Screenshot.Width  * Screenshot.NormalizedDimension;
+    public double NormalizedX => Screenshot.Width  == 0 ? 0 : (double)ImageX / Screenshot.Width  * Screenshot.DefaultNormalized;
 
     /// <summary>
     /// Y position normalised to a 0–1000 scale across the height of the captured screenshot.
     /// Matches the coordinate space used by the AI and <see cref="CoordinatePrompter"/>.
     /// </summary>
-    public double NormalizedY => Screenshot.Height == 0 ? 0 : (double)ImageY / Screenshot.Height * Screenshot.NormalizedDimension;
+    public double NormalizedY => Screenshot.Height == 0 ? 0 : (double)ImageY / Screenshot.Height * Screenshot.DefaultNormalized;
 
     // ── Monitor info ─────────────────────────────────────────────────────────
 
@@ -122,7 +122,7 @@ public sealed class ScreenCoordinate(int AbsoluteX, int AbsoluteY, Screenshot Sc
     public static ScreenCoordinate FromNormalizedCoordsString(string coordStr, Screenshot screenshot, MonitorInfo? monitor = null)
     {
         (int nx, int ny) = ParseCoordsString(coordStr);
-        return FromNormalized(nx, ny, Screenshot.NormalizedDimension, Screenshot.NormalizedDimension, screenshot, monitor);
+        return FromNormalized(nx, ny, Screenshot.DefaultNormalized, Screenshot.DefaultNormalized, screenshot, monitor);
     }
 
     /// <summary>

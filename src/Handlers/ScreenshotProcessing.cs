@@ -33,12 +33,12 @@ public sealed partial class CoordinatePrompter
     /// Produces the full-image grid overlay PNG from raw screenshot bytes with no AI calls or zooming.
     /// Used by the test endpoint to preview what the first-iteration grid image looks like.
     /// </summary>
-    public byte[] CreateFullGridOverlayImage(byte[] screenshotBytes)
+    public static byte[] CreateFullGridOverlayImage(byte[] screenshotBytes)
     {
         ArgumentNullException.ThrowIfNull(screenshotBytes);
         using IImage source = LoadImage(screenshotBytes);
         ViewRegion view = CreateFullView(source);
-        return CreateGridOverlayImage(source, view, _divisions, _divisions, gridAxisMaxValue: 1000, noOuterBorder: true);
+        return CreateGridOverlayImage(source, view, Screenshot.DefaultDivisions, Screenshot.DefaultDivisions, gridAxisMaxValue: Screenshot.DefaultNormalized, noOuterBorder: true);
     }
 
     /// <summary>Decodes raw image bytes into an <see cref="IImage"/> for use with the canvas.</summary>
@@ -105,7 +105,7 @@ public sealed partial class CoordinatePrompter
     /// the given absolute pixel position. Used for Direct / DirectAutoNormalize modes where there
     /// is no grid overlay and the coordinate is already an un-normalised pixel location.
     /// </summary>
-    internal static byte[] CreateAnnotatedImageDirect(byte[] imageBytes, double pixelX, double pixelY)
+    internal static byte[] CreateAnnotatedImage_PixelCoords(byte[] imageBytes, double pixelX, double pixelY)
     {
         using IImage image = LoadImage(imageBytes);
         int w = (int)image.Width;
@@ -193,14 +193,16 @@ public sealed partial class CoordinatePrompter
     }
 
 
-    /// <summary>Returns a copy of the grid image with a crosshair marker drawn at the parsed coordinate.</summary>
-    private static byte[] CreateAnnotatedImage(
+    /// <summary>Returns a copy of the grid image with a crosshair marker drawn at the parsed coordinate.
+    /// Uses grid/normalized coordinates, not screen pixel coordinates
+    /// </summary>
+    private static byte[] CreateAnnotatedImage_NormalizedCoords(
         byte[] gridImageBytes,
         GridCoordinate coordinate,
         int imageWidth,
         int imageHeight,
-        int cols = DefaultDivisions,
-        int rows = DefaultDivisions)
+        int cols = Screenshot.DefaultDivisions,
+        int rows = Screenshot.DefaultDivisions)
     {
         int rulerOffset = ComputeRulerOffset(imageWidth, Math.Max(cols, rows));
 
@@ -354,8 +356,8 @@ public sealed partial class CoordinatePrompter
     /// <summary> / Creates a PNG image of the source cropped to <paramref name="view"/> with a grid / overlay and axis labels drawn on top. / </summary>
         IImage source,
         ViewRegion view,
-        int cols = DefaultDivisions,
-        int rows = DefaultDivisions,
+        int cols = Screenshot.DefaultDivisions,
+        int rows = Screenshot.DefaultDivisions,
         int? gridAxisMaxValue = null,
         Color? gridColor = null,
         float? lineThickness = null,
@@ -430,8 +432,8 @@ public sealed partial class CoordinatePrompter
     /// <summary> / Determines whether another zoom iteration is warranted based on the AI's / estimated precision in pixels compared to a confidence threshold. / </summary>
     private static bool ShouldContinueZooming(
         ViewRegion currentView,
-        int cols = DefaultDivisions,
-        int rows = DefaultDivisions,
+        int cols = Screenshot.DefaultDivisions,
+        int rows = Screenshot.DefaultDivisions,
         double confidencePixels = DefaultConfidencePixels,
         double aiEstimatePrecision = DefaultAIEstimatePrecision)
     {
@@ -477,8 +479,8 @@ public sealed partial class CoordinatePrompter
         GridCoordinate coordinate,
         double sourceWidth,
         double sourceHeight,
-        int cols = DefaultDivisions,
-        int rows = DefaultDivisions)
+        int cols = Screenshot.DefaultDivisions,
+        int rows = Screenshot.DefaultDivisions)
     {
         double cellPixelW = currentView.Width / cols;
         double cellPixelH = currentView.Height / rows;
