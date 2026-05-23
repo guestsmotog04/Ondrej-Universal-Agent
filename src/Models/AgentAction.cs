@@ -130,7 +130,7 @@ public sealed record ActionExecutionResult(
 /// <param name="StepNumber">1-based index of the upcoming step.</param>
 /// <param name="Thought">The AI's reasoning for this step.</param>
 /// <param name="Action">The tool invocation that is about to be executed.</param>
-public sealed record AgentStepPreview(int StepNumber, string Thought, AgentAction Action);
+public sealed record AgentStepPreview(int StepNumber, string Thought, AgentAction Action, int QueueSize = 1);
 
 /// <summary>
 /// A real-time sub-step update emitted during action execution.
@@ -156,6 +156,21 @@ public sealed record StepTimings(
     long ExecutionMs,
     long? CoordResolutionMs);
 
+/// <summary>One action executed within a QUEUE: batch — its result, timing, and debug entries.</summary>
+/// <param name="QueueIndex">0-based position in the queue.</param>
+/// <param name="Action">The tool invocation that was executed.</param>
+/// <param name="Result">Outcome of the execution.</param>
+/// <param name="DurationMs">Wall-clock milliseconds spent executing this action.</param>
+/// <param name="DebugLog">Verbose debug entries (only when testing is enabled).</param>
+/// <param name="Timings">Per-phase timing breakdown for this action.</param>
+public sealed record QueuedSubStep(
+    int QueueIndex,
+    AgentAction Action,
+    ActionExecutionResult Result,
+    long DurationMs,
+    IReadOnlyList<AgentDebugEntry>? DebugLog = null,
+    StepTimings? Timings = null);
+
 /// <summary>A single completed step in the agent's execution history.</summary>
 /// <param name="StepNumber">1-based index of this step.</param>
 /// <param name="Thought">The AI's reasoning for this step.</param>
@@ -173,4 +188,5 @@ public sealed record AgentStep(
     DateTimeOffset Timestamp,
     long DurationMs,
     IReadOnlyList<AgentDebugEntry>? DebugLog = null,
-    StepTimings? Timings = null);
+    StepTimings? Timings = null,
+    IReadOnlyList<QueuedSubStep>? QueuedSubSteps = null);

@@ -126,7 +126,7 @@ public static class AgentPromptBuilder
             12. Always visually confirm the action was taken to ensure it worked is possible. For example, the computer may have missed the action and it needs to be repeated.
             13. Prefer the use of COORDS mode for tools where available. If it repeatly fails to hit the correction location, try using natural language.
             14. Queued actions should ONLY be used if the user interface is not expected to change from the actions. For example, checking multiple boxes in the same window, but NOT to close a menu then click something behind it.
-
+                Tip: Test an action once by itself before queuing up the rest of the sequence the queue.
             ═══════════════════════════════════
             YOUR GOAL
             ═══════════════════════════════════

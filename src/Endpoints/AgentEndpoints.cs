@@ -250,6 +250,7 @@ internal static class AgentEndpoints
             preview.StepNumber,
             preview.Thought,
             action = FormatAction(preview.Action),
+            preview.QueueSize,
         };
 
         string json = JsonSerializer.Serialize(payload, JsonOptions);
@@ -279,6 +280,22 @@ internal static class AgentEndpoints
                 coordResolutionMs = step.Timings.CoordResolutionMs,
             },
             debugLog = step.DebugLog?.Select(e => new { e.Label, e.Text, e.ImageBase64 }),
+            queuedSubSteps = step.QueuedSubSteps?.Select(s => new
+            {
+                s.QueueIndex,
+                action = FormatAction(s.Action),
+                result = s.Result.Summary,
+                s.Result.Success,
+                s.DurationMs,
+                timings = s.Timings is null ? null : new
+                {
+                    aiResponseMs      = s.Timings.AiResponseMs,
+                    parseMs           = s.Timings.ParseMs,
+                    executionMs       = s.Timings.ExecutionMs,
+                    coordResolutionMs = s.Timings.CoordResolutionMs,
+                },
+                debugLog = s.DebugLog?.Select(e => new { e.Label, e.Text, e.ImageBase64 }),
+            }),
         };
 
         string json = JsonSerializer.Serialize(payload, JsonOptions);

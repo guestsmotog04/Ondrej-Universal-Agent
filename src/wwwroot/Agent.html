@@ -540,6 +540,81 @@
         .timing-exec  { background: #0d200d; color: #4a9a4a; border: 1px solid #1a4a1a; }
         .timing-coord { background: #200d20; color: #b060c0; border: 1px solid #4a1a4a; }
 
+        /* ---- Queue badge on the action label ---- */
+        .queue-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            color: #f0c040;
+            background: #2a2000;
+            border: 1px solid #5a4a00;
+            border-radius: 3px;
+            padding: 1px 6px;
+            margin-left: 6px;
+            vertical-align: middle;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+        }
+
+        /* ---- Nested queued sub-steps ---- */
+        .queue-substeps {
+            margin-top: 8px;
+        }
+
+        .queue-substeps summary {
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #f0c040;
+            padding: 3px 0;
+            user-select: none;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .queue-substeps summary::-webkit-details-marker { display: none; }
+
+        .queue-substeps summary::before {
+            content: '▶';
+            font-size: 8px;
+            transition: transform 0.15s;
+            color: #a08020;
+        }
+
+        .queue-substeps[open] summary::before { transform: rotate(90deg); }
+        .queue-substeps summary:hover { color: #ffd84a; }
+
+        .queue-substep-list {
+            margin-top: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding-left: 12px;
+            border-left: 2px solid #3a3000;
+        }
+
+        .queue-substep-item {
+            background: #0f0f00;
+            border: 1px solid #2a2500;
+            border-radius: 4px;
+            padding: 7px 10px;
+        }
+
+        .queue-substep-action {
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 12px;
+            color: #e0c060;
+        }
+
+        .queue-substep-result {
+            font-size: 11px;
+            color: #666;
+            margin-top: 2px;
+        }
+
         #elapsed-timer {
             margin-left: auto;
             font-family: 'Cascadia Code', 'Consolas', monospace;
@@ -916,10 +991,9 @@
     function handleStepStarting(msg) {
         stepCounter.textContent = `Step ${msg.stepNumber}`;
 
-        // Update current step card immediately so the user can see
-        // what the agent decided before slow work (e.g. coordinate resolution) begins.
         currentThought.textContent = msg.thought;
-        currentAction.textContent = msg.action;
+        const queueBadge = (msg.queueSize > 1) ? ` <span class="queue-badge">QUEUE ×${msg.queueSize}</span>` : '';
+        currentAction.innerHTML = escapeHtml(msg.action) + queueBadge;
         currentAction.style.display = 'inline-block';
         currentResult.textContent = 'Executing…';
         liveSubsteps.innerHTML = '';
@@ -960,22 +1034,21 @@
         stepsData.push(msg);
         stepCounter.textContent = `Step ${msg.stepNumber}`;
 
-        // Clear live sub-steps since the full step is now complete
         liveSubsteps.innerHTML = '';
 
-        // Update current step card
         currentThought.textContent = msg.thought;
-        currentAction.textContent = msg.action;
+        const queueBadge = (msg.queuedSubSteps && msg.queuedSubSteps.length > 1)
+            ? ` <span class="queue-badge">QUEUE ×${msg.queuedSubSteps.length}</span>` : '';
+        currentAction.innerHTML = escapeHtml(msg.action) + queueBadge;
         currentAction.style.display = 'inline-block';
         currentResult.textContent = msg.result;
 
-        // Build step log entry
         const entry = document.createElement('div');
         entry.className = 'step-entry';
 
         let html = `
             <span class="step-num">#${msg.stepNumber}</span>
-            <span class="step-action">${escapeHtml(msg.action)}</span>
+            <span class="step-action">${escapeHtml(msg.action)}${queueBadge}</span>
             <span class="step-duration">${formatDuration(msg.durationMs)}</span>
             <div class="step-thought">${escapeHtml(msg.thought)}</div>
             <div class="step-result">${escapeHtml(msg.result)}</div>
@@ -993,7 +1066,11 @@
             html += timingsHtml;
         }
 
-        // Debug panel
+        // Nested expandable queue sub-steps
+        if (msg.queuedSubSteps && msg.queuedSubSteps.length > 1) {
+            html += renderQueuedSubSteps(msg.queuedSubSteps);
+        }
+
         if (msg.debugLog && msg.debugLog.length > 0) {
             const visibleEntries = debugEnabled
                 ? msg.debugLog
@@ -1005,7 +1082,6 @@
 
         entry.innerHTML = html;
 
-        // Bind click-to-expand for debug images
         entry.querySelectorAll('.debug-entry-img').forEach(img => {
             img.addEventListener('click', () => img.classList.toggle('expanded'));
         });
@@ -1021,6 +1097,23 @@
             stopElapsedTimer(null);
             cleanup();
         }
+    }
+
+    function renderQueuedSubSteps(subSteps) {
+        let html = `<details class="queue-substeps"><summary>Queued Actions <span class="queue-badge">${subSteps.length} actions</span></summary><div class="queue-substep-list">`;
+        for (const s of subSteps) {
+            const ok = s.success;
+            html += `<div class="queue-substep-item">`;
+            html += `<div class="queue-substep-action">${escapeHtml(s.action)}<span class="step-duration">&nbsp;${formatDuration(s.durationMs)}</span></div>`;
+            html += `<div class="queue-substep-result">${ok ? '✓' : '✗'}&nbsp;${escapeHtml(s.result)}</div>`;
+            if (s.debugLog && debugEnabled) {
+                const vis = s.debugLog.filter(e => e.text || e.imageBase64);
+                if (vis.length > 0) html += renderDebugLog(vis);
+            }
+            html += `</div>`;
+        }
+        html += `</div></details>`;
+        return html;
     }
 
     function renderDebugLog(entries) {
