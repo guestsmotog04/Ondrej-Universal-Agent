@@ -147,44 +147,43 @@ public sealed class AgentActionExecutor(
         // If exact coordinates were supplied directly, parse and dispatch without AI resolution.
         else if (action.AltMode == AgentActionAltMode.ExactCoords)
         {
-            (int px, int py) = CoordinatePrompter.ParseAndNormalizeCoords(target, screenshot);
+            ScreenCoordinate coord = ScreenCoordinate.FromNormalizedCoordsString(target, screenshot);
 
             if (debugLog is not null || onProgress is not null)
             {
-                var (imgX, imgY) = screenshot.ToImageRelative(px, py);
-                screenshot.Annotated = CoordinatePrompter.CreateAnnotatedImageDirect(screenshot.Processed, imgX, imgY);
+                screenshot.Annotated = CoordinatePrompter.CreateAnnotatedImageDirect(screenshot.Processed, coord.ImageX, coord.ImageY);
                 await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Annotated Screenshot", ImageBase64: Convert.ToBase64String(screenshot.Annotated))).ConfigureAwait(false);
             }
 
-            logger.LogInformation("{ActionKind} at exact coordinates ({X}, {Y}).", action.Kind, px, py);
-            await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Exact Coordinates", Text: $"({px}, {py})")).ConfigureAwait(false);
+            logger.LogInformation("{ActionKind} at exact coordinates ({X}, {Y}).", action.Kind, coord.AbsoluteX, coord.AbsoluteY);
+            await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Exact Coordinates", Text: coord.ToString())).ConfigureAwait(false);
 
             string exactMethodCalled;
             switch (action.Kind)
             {
                 case AgentActionKind.LeftClick or AgentActionKind.LeftClickCoords:
-                    await inputProvider.LeftClick_MonitorCoords(px, py).ConfigureAwait(false);
-                    exactMethodCalled = $"LeftClick_MonitorCoords({px}, {py})";
+                    await inputProvider.LeftClick_MonitorCoords(coord.AbsoluteX, coord.AbsoluteY).ConfigureAwait(false);
+                    exactMethodCalled = $"LeftClick_MonitorCoords({coord.AbsoluteX}, {coord.AbsoluteY})";
                     break;
 
                 case AgentActionKind.RightClick or AgentActionKind.RightClickCoords:
-                    await inputProvider.RightClick_MonitorCoords(px, py).ConfigureAwait(false);
-                    exactMethodCalled = $"RightClick_MonitorCoords({px}, {py})";
+                    await inputProvider.RightClick_MonitorCoords(coord.AbsoluteX, coord.AbsoluteY).ConfigureAwait(false);
+                    exactMethodCalled = $"RightClick_MonitorCoords({coord.AbsoluteX}, {coord.AbsoluteY})";
                     break;
 
                 case AgentActionKind.DoubleClick or AgentActionKind.DoubleClickCoords:
-                    await inputProvider.DoubleClick_MonitorCoords(px, py).ConfigureAwait(false);
-                    exactMethodCalled = $"DoubleClick_MonitorCoords({px}, {py})";
+                    await inputProvider.DoubleClick_MonitorCoords(coord.AbsoluteX, coord.AbsoluteY).ConfigureAwait(false);
+                    exactMethodCalled = $"DoubleClick_MonitorCoords({coord.AbsoluteX}, {coord.AbsoluteY})";
                     break;
 
                 case AgentActionKind.MiddleClick or AgentActionKind.MiddleClickCoords:
-                    await inputProvider.MiddleMouse_MonitorCoords(px, py).ConfigureAwait(false);
-                    exactMethodCalled = $"MiddleMouse_MonitorCoords({px}, {py})";
+                    await inputProvider.MiddleMouse_MonitorCoords(coord.AbsoluteX, coord.AbsoluteY).ConfigureAwait(false);
+                    exactMethodCalled = $"MiddleMouse_MonitorCoords({coord.AbsoluteX}, {coord.AbsoluteY})";
                     break;
 
                 case AgentActionKind.MoveMouse or AgentActionKind.MoveMouseCoords:
-                    await inputProvider.MoveMouse_MonitorCoords(px, py).ConfigureAwait(false);
-                    exactMethodCalled = $"MoveMouse_MonitorCoords({px}, {py})";
+                    await inputProvider.MoveMouse_MonitorCoords(coord.AbsoluteX, coord.AbsoluteY).ConfigureAwait(false);
+                    exactMethodCalled = $"MoveMouse_MonitorCoords({coord.AbsoluteX}, {coord.AbsoluteY})";
                     break;
 
                 default:
@@ -194,8 +193,7 @@ public sealed class AgentActionExecutor(
 
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("OS Input Call", Text: exactMethodCalled)).ConfigureAwait(false);
 
-            string exactCoordStr = $"({px.ToString(CultureInfo.InvariantCulture)}, {py.ToString(CultureInfo.InvariantCulture)})";
-            return new ActionExecutionResult(true, $"{action.Kind} at exact coordinates {exactCoordStr}.", IsTerminal: false, GoalAchieved: false);
+            return new ActionExecutionResult(true, $"{action.Kind} at exact coordinates {coord}.", IsTerminal: false, GoalAchieved: false);
         }
         // If we need to resolve the coordinates from natural language description
         else
@@ -231,45 +229,40 @@ public sealed class AgentActionExecutor(
             }
 
             var coordSw = Stopwatch.StartNew();
-            (double x, double y, double? normX, double? normY) = await coordinatePrompter
-                .GetCoordinatesForItemAsync(screenshot.Processed, target, onStepCompleted: onCoordStep, cancellationToken: cancellationToken)
+            ScreenCoordinate coord = await coordinatePrompter
+                .GetCoordinatesForItemAsync(screenshot, target, onStepCompleted: onCoordStep, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
             coordSw.Stop();
 
-            // Shift image-pixel coordinates to absolute screen coordinates.
-            // On multi-monitor setups the virtual screen may start at a negative offset
-            // (e.g. a secondary monitor positioned to the left of the primary).
-            var (px, py) = screenshot.ToAbsolute((int)Math.Round(x), (int)Math.Round(y));
-
-            logger.LogInformation("{ActionKind} at ({X}, {Y}) for \"{Target}\".", action.Kind, px, py, target);
-            await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Final Resolved Coordinates", Text: $"({px}, {py})")).ConfigureAwait(false);
+            logger.LogInformation("{ActionKind} at ({X}, {Y}) for \"{Target}\".", action.Kind, coord.AbsoluteX, coord.AbsoluteY, target);
+            await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Final Resolved Coordinates", Text: coord.ToString())).ConfigureAwait(false);
 
             string methodCalled;
             switch (action.Kind)
             {
                 case AgentActionKind.LeftClick or AgentActionKind.LeftClickCoords:
-                    await inputProvider.LeftClick_MonitorCoords(px, py).ConfigureAwait(false);
-                    methodCalled = $"LeftClick_MonitorCoords({px}, {py})";
+                    await inputProvider.LeftClick_MonitorCoords(coord.AbsoluteX, coord.AbsoluteY).ConfigureAwait(false);
+                    methodCalled = $"LeftClick_MonitorCoords({coord.AbsoluteX}, {coord.AbsoluteY})";
                     break;
 
                 case AgentActionKind.RightClick or AgentActionKind.RightClickCoords:
-                    await inputProvider.RightClick_MonitorCoords(px, py).ConfigureAwait(false);
-                    methodCalled = $"RightClick_MonitorCoords({px}, {py})";
+                    await inputProvider.RightClick_MonitorCoords(coord.AbsoluteX, coord.AbsoluteY).ConfigureAwait(false);
+                    methodCalled = $"RightClick_MonitorCoords({coord.AbsoluteX}, {coord.AbsoluteY})";
                     break;
 
                 case AgentActionKind.DoubleClick or AgentActionKind.DoubleClickCoords:
-                    await inputProvider.DoubleClick_MonitorCoords(px, py).ConfigureAwait(false);
-                    methodCalled = $"DoubleClick_MonitorCoords({px}, {py})";
+                    await inputProvider.DoubleClick_MonitorCoords(coord.AbsoluteX, coord.AbsoluteY).ConfigureAwait(false);
+                    methodCalled = $"DoubleClick_MonitorCoords({coord.AbsoluteX}, {coord.AbsoluteY})";
                     break;
 
                 case AgentActionKind.MiddleClick or AgentActionKind.MiddleClickCoords:
-                    await inputProvider.MiddleMouse_MonitorCoords(px, py).ConfigureAwait(false);
-                    methodCalled = $"MiddleMouse_MonitorCoords({px}, {py})";
+                    await inputProvider.MiddleMouse_MonitorCoords(coord.AbsoluteX, coord.AbsoluteY).ConfigureAwait(false);
+                    methodCalled = $"MiddleMouse_MonitorCoords({coord.AbsoluteX}, {coord.AbsoluteY})";
                     break;
 
                 case AgentActionKind.MoveMouse or AgentActionKind.MoveMouseCoords:
-                    await inputProvider.MoveMouse_MonitorCoords(px, py).ConfigureAwait(false);
-                    methodCalled = $"MoveMouse_MonitorCoords({px}, {py})";
+                    await inputProvider.MoveMouse_MonitorCoords(coord.AbsoluteX, coord.AbsoluteY).ConfigureAwait(false);
+                    methodCalled = $"MoveMouse_MonitorCoords({coord.AbsoluteX}, {coord.AbsoluteY})";
                     break;
 
                 default:
@@ -279,11 +272,8 @@ public sealed class AgentActionExecutor(
 
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("OS Input Call", Text: methodCalled)).ConfigureAwait(false);
 
-            string trueCoordStr = $"({px.ToString(CultureInfo.InvariantCulture)}, {py.ToString(CultureInfo.InvariantCulture)})";
-            string normSuffix = normX.HasValue && normY.HasValue
-                ? $" (1000x1000 Normalized @ X={normX:F0}, Y={normY:F0})"
-                : string.Empty;
-            return new ActionExecutionResult(true, $"{action.Kind} at {trueCoordStr}{normSuffix} targeting \"{target}\".", IsTerminal: false, GoalAchieved: false, CoordResolutionMs: coordSw.ElapsedMilliseconds);
+            string normSuffix = $" (1000x1000 Normalized @ X={coord.NormalizedX:F0}, Y={coord.NormalizedY:F0})";
+            return new ActionExecutionResult(true, $"{action.Kind} at {coord}{normSuffix} targeting \"{target}\".", IsTerminal: false, GoalAchieved: false, CoordResolutionMs: coordSw.ElapsedMilliseconds);
         }
     }
 
@@ -306,6 +296,7 @@ public sealed class AgentActionExecutor(
         await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Source Resolution", Text: $"Resolving source: \"{source}\"")).ConfigureAwait(false);
 
         int startPx, startPy, endPx, endPy;
+        ScreenCoordinate? startCoordAi = null, endCoordAi = null;
         long startCoordMs = 0, endCoordMs = 0;
         long? totalCoordMs = null;
 
@@ -325,8 +316,10 @@ public sealed class AgentActionExecutor(
             }
             else
             {
-                (startPx, startPy) = CoordinatePrompter.ParseAndNormalizeCoords(source, screenshot);
-                }
+                ScreenCoordinate startCoord = ScreenCoordinate.FromNormalizedCoordsString(source, screenshot);
+                startPx = startCoord.AbsoluteX;
+                startPy = startCoord.AbsoluteY;
+            }
 
                 // Resolve end point
                 if (action.AltMode == AgentActionAltMode.CurrentCursorPositionEnd
@@ -339,35 +332,43 @@ public sealed class AgentActionExecutor(
                 }
                 else
                 {
-                    (endPx, endPy) = CoordinatePrompter.ParseAndNormalizeCoords(destination, screenshot);
+                    ScreenCoordinate endCoord = ScreenCoordinate.FromNormalizedCoordsString(destination, screenshot);
+                    endPx = endCoord.AbsoluteX;
+                    endPy = endCoord.AbsoluteY;
                 }
         }
         else
         {
-            (startPx, startPy, startCoordMs) = await ResolveTargetCoordinatesAsync(screenshot, source, cancellationToken, debugLog, onProgress)
+            (startCoordAi, startCoordMs) = await ResolveTargetCoordinatesAsync(screenshot, source, cancellationToken, debugLog, onProgress)
                 .ConfigureAwait(false);
+            startPx = startCoordAi.AbsoluteX;
+            startPy = startCoordAi.AbsoluteY;
 
             logger.LogInformation("Drag source at ({X}, {Y}) for \"{Target}\".", startPx, startPy, source);
-            await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Source Coordinates", Text: $"({startPx}, {startPy})")).ConfigureAwait(false);
+            await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Source Coordinates", Text: startCoordAi.ToString())).ConfigureAwait(false);
 
             // Resolve destination coordinates
             logger.LogInformation("Resolving drag destination coordinates for: \"{Target}\"", destination);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Destination Resolution", Text: $"Resolving destination: \"{destination}\"")).ConfigureAwait(false);
 
-            (endPx, endPy, endCoordMs) = await ResolveTargetCoordinatesAsync(screenshot, destination, cancellationToken, debugLog, onProgress)
+            (endCoordAi, endCoordMs) = await ResolveTargetCoordinatesAsync(screenshot, destination, cancellationToken, debugLog, onProgress)
                 .ConfigureAwait(false);
+            endPx = endCoordAi.AbsoluteX;
+            endPy = endCoordAi.AbsoluteY;
 
             totalCoordMs = startCoordMs + endCoordMs;
         }
 
         logger.LogInformation("Drag destination at ({X}, {Y}) for \"{Target}\".", endPx, endPy, destination);
-        await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Destination Coordinates", Text: $"({endPx}, {endPy})")).ConfigureAwait(false);
+        await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Destination Coordinates", Text: endCoordAi?.ToString() ?? $"({endPx}, {endPy})")).ConfigureAwait(false);
 
         // Emit a combined annotated screenshot showing both start (green) and end (red) crosshairs
         if (debugLog is not null || onProgress is not null)
         {
-            var (startImgX, startImgY) = screenshot.ToImageRelative(startPx, startPy);
-            var (endImgX, endImgY) = screenshot.ToImageRelative(endPx, endPy);
+            int startImgX = startCoordAi?.ImageX ?? startPx - screenshot.OriginX;
+            int startImgY = startCoordAi?.ImageY ?? startPy - screenshot.OriginY;
+            int endImgX   = endCoordAi?.ImageX   ?? endPx   - screenshot.OriginX;
+            int endImgY   = endCoordAi?.ImageY   ?? endPy   - screenshot.OriginY;
             screenshot.Annotated = CoordinatePrompter.CreateAnnotatedImageDrag(
                 screenshot.Processed,
                 startImgX, startImgY,
@@ -389,7 +390,7 @@ public sealed class AgentActionExecutor(
     }
 
     /// <summary>Resolves a target description to absolute screen coordinates using the coordinate prompter.</summary>
-    private async Task<(int px, int py, long coordMs)> ResolveTargetCoordinatesAsync(
+    private async Task<(ScreenCoordinate coord, long coordMs)> ResolveTargetCoordinatesAsync(
         Screenshot screenshot, string target, CancellationToken cancellationToken,
         List<AgentDebugEntry>? debugLog, Func<AgentDebugEntry, Task>? onProgress = null)
     {
@@ -420,14 +421,12 @@ public sealed class AgentActionExecutor(
         }
 
         var coordSw = Stopwatch.StartNew();
-        (double x, double y, _, _) = await coordinatePrompter
-            .GetCoordinatesForItemAsync(screenshot.Processed, target, onStepCompleted: onCoordStep, cancellationToken: cancellationToken)
+        ScreenCoordinate coord = await coordinatePrompter
+            .GetCoordinatesForItemAsync(screenshot, target, onStepCompleted: onCoordStep, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
         coordSw.Stop();
 
-        var (px, py) = screenshot.ToAbsolute((int)Math.Round(x), (int)Math.Round(y));
-
-        return (px, py, coordSw.ElapsedMilliseconds);
+        return (coord, coordSw.ElapsedMilliseconds);
     }
 
     private async Task<ActionExecutionResult> ExecuteTypeTextAsync(AgentAction action, List<AgentDebugEntry>? debugLog, Func<AgentDebugEntry, Task>? onProgress = null)

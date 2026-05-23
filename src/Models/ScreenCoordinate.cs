@@ -82,6 +82,60 @@ public sealed class ScreenCoordinate(int AbsoluteX, int AbsoluteY, Screenshot Sc
     /// <summary>The screenshot this coordinate was resolved against.</summary>
     public Screenshot Screenshot { get; } = Screenshot;
 
+    // ── Factories ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Creates a <see cref="ScreenCoordinate"/> from image-local pixel coordinates
+    /// (i.e. pixel offsets within the captured bitmap, as returned by the AI or zoom pipeline).
+    /// Rounds to the nearest integer and adds the screenshot origin.
+    /// </summary>
+    public static ScreenCoordinate FromImagePixels(double imgX, double imgY, Screenshot screenshot, MonitorInfo? monitor = null)
+    {
+        int absX = (int)Math.Round(imgX) + screenshot.OriginX;
+        int absY = (int)Math.Round(imgY) + screenshot.OriginY;
+        return new ScreenCoordinate(absX, absY, screenshot, monitor);
+    }
+
+    /// <summary>
+    /// Creates a <see cref="ScreenCoordinate"/> from coordinates that are normalised to an
+    /// arbitrary <paramref name="normalizedWidth"/> × <paramref name="normalizedHeight"/> space
+    /// (typically 1000×1000 as used by the AI grid).
+    /// Un-normalises to image pixels relative to <see cref="Screenshot.Width"/>/<see cref="Screenshot.Height"/>,
+    /// then delegates to <see cref="FromImagePixels"/>.
+    /// </summary>
+    public static ScreenCoordinate FromNormalized(
+        double normX, double normY,
+        int normalizedWidth, int normalizedHeight,
+        Screenshot screenshot, MonitorInfo? monitor = null)
+    {
+        double imgX = Math.Round(normX / normalizedWidth  * screenshot.Width);
+        double imgY = Math.Round(normY / normalizedHeight * screenshot.Height);
+        return FromImagePixels(imgX, imgY, screenshot, monitor);
+    }
+
+    /// <summary>
+    /// Parses an AI-supplied <c>"X,Y"</c> string where the values are coordinates normalised
+    /// to a 1000×1000 grid (the format used by <c>ExactCoords</c> actions and the
+    /// <c>CoordinatePrompter</c> direct mode).
+    /// Throws <see cref="FormatException"/> on bad input.
+    /// </summary>
+    public static ScreenCoordinate FromNormalizedCoordsString(string coordStr, Screenshot screenshot, MonitorInfo? monitor = null)
+    {
+        (int nx, int ny) = ParseCoordsString(coordStr);
+        return FromNormalized(nx, ny, 1000, 1000, screenshot, monitor);
+    }
+
+    /// <summary>
+    /// Parses a raw <c>"X,Y"</c> string where values are already image-local pixel coordinates
+    /// (no normalisation step). Useful when coordinates come from sources that report true pixels.
+    /// Throws <see cref="FormatException"/> on bad input.
+    /// </summary>
+    public static ScreenCoordinate FromRawPixelCoordsString(string coordStr, Screenshot screenshot, MonitorInfo? monitor = null)
+    {
+        (int imgX, int imgY) = ParseCoordsString(coordStr);
+        return FromImagePixels(imgX, imgY, screenshot, monitor);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <inheritdoc/>
@@ -89,4 +143,17 @@ public sealed class ScreenCoordinate(int AbsoluteX, int AbsoluteY, Screenshot Sc
         Monitor is null
             ? $"Abs=({AbsoluteX}, {AbsoluteY})  Img=({ImageX}, {ImageY})  Norm=({NormalizedX:F0}, {NormalizedY:F0})"
             : $"Abs=({AbsoluteX}, {AbsoluteY})  Img=({ImageX}, {ImageY})  Norm=({NormalizedX:F0}, {NormalizedY:F0})  Monitor[{Monitor.Index}]=({MonitorX}, {MonitorY})";
+
+    // Shared parser: splits "X,Y" and returns two ints, throws FormatException on failure.
+    private static (int x, int y) ParseCoordsString(string coordStr)
+    {
+        string[] parts = coordStr.Split(',');
+        if (parts.Length == 2
+            && int.TryParse(parts[0].Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int x)
+            && int.TryParse(parts[1].Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int y))
+        {
+            return (x, y);
+        }
+        throw new FormatException($"Invalid coordinate format: \"{coordStr}\". Expected \"X,Y\" with integer values.");
+    }
 }

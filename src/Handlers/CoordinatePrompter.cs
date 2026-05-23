@@ -321,6 +321,26 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         }
     }
 
+    /// <summary>
+    /// Convenience overload that accepts a <see cref="Screenshot"/> instead of raw bytes and
+    /// returns a fully-populated <see cref="ScreenCoordinate"/> rather than a raw value tuple.
+    /// Uses <see cref="Screenshot.Processed"/> as the image sent to the AI and converts the
+    /// resulting image-pixel coordinates via <see cref="ScreenCoordinate.FromImagePixels"/>.
+    /// </summary>
+    public async Task<ScreenCoordinate> GetCoordinatesForItemAsync(
+        Screenshot screenshot,
+        string itemToIdentify,
+        CoordinateMode? mode = null,
+        Func<CoordinateStep, Task>? onStepCompleted = null,
+        CancellationToken cancellationToken = default)
+    {
+        (double x, double y, double? normX, double? normY) = await GetCoordinatesForItemAsync(
+            screenshot.Processed, itemToIdentify, mode, onStepCompleted, cancellationToken)
+            .ConfigureAwait(false);
+
+        return ScreenCoordinate.FromImagePixels(x, y, screenshot);
+    }
+
 
     /// <summary> Sends the raw screenshot to the AI in a single request and returns the absolute pixel coordinates reported by the model, with no grid overlay or zoom. </summary>
     private async Task<(double X, double Y, double? NormX, double? NormY)> GetCoordinatesDirectAsync(
@@ -718,7 +738,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         return UnNormalizeCoordinates(xRound, yRound, normalizedWidth, normalizedHeight, originalWidth, originalHeight);
     }
 
-    public static (double TrueXCoords, double TrueYCoords) UnNormalizeCoordinates(int x, int y, int normalizedWidth, int normalizedHeight, int originalWidth, int originalHeight)
+    private static (double TrueXCoords, double TrueYCoords) UnNormalizeCoordinates(int x, int y, int normalizedWidth, int normalizedHeight, int originalWidth, int originalHeight)
     {
         double TrueXCoord = ((double)x / normalizedWidth) * originalWidth;
         double TrueYCoord = ((double)y / normalizedHeight) * originalHeight;
@@ -728,27 +748,6 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         TrueYCoord = Math.Round(TrueYCoord);
 
         return (TrueXCoord, TrueYCoord);
-    }
-
-    // When ExactCoords is enabled, the Target and DragTarget fields contain literal "X,Y" coordinate pairs rather than natural language descriptions.
-    // This allows the AI to bypass the CoordinatePrompter when it needs to perform precise adjustments based on pixel values from the screenshot.
-    // Returns absolute virtual-desktop coordinates ready for OS input APIs.
-    public static (int px, int py) ParseAndNormalizeCoords(string coordStr, Screenshot screenshot)
-    {
-        string[] parts = coordStr.Split(',');
-        if (parts.Length != 2
-            || !int.TryParse(parts[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int px)
-            || !int.TryParse(parts[1].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int py))
-        {
-            throw new FormatException($"Invalid coordinate format: \"{coordStr}\". Expected format: \"X,Y\" with integer values.");
-        }
-        else
-        {
-            (int imgWidth, int imgHeight) = CoordinatePrompter.GetImageResolution(screenshot.Processed);
-            (double TrueXCoords, double TrueYCoords) = CoordinatePrompter.UnNormalizeCoordinates(px, py, 1000, 1000, imgWidth, imgHeight);
-
-            return screenshot.ToAbsolute((int)TrueXCoords, (int)TrueYCoords);
-        }
     }
 
     /// <summary> Converts grid coordinates on the current (possibly zoomed) view back to absolute screen pixel coordinates, assuming the original image matches screen resolution. </summary>
