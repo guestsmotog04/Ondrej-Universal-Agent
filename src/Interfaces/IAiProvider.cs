@@ -1,4 +1,4 @@
-namespace Thio_Universal_Agent.AI_API;
+namespace Thio_Universal_Agent;
 
 /// <summary>Abstraction for sending prompts to an AI model provider.</summary>
 public interface IAiProvider

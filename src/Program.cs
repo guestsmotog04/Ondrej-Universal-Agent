@@ -1,7 +1,6 @@
 // Program.cs
 using Microsoft.Extensions.FileProviders;
 using Thio_Universal_Agent;
-using Thio_Universal_Agent.AI_API;
 using Thio_Universal_Agent.AI_API.Gemini;
 using Thio_Universal_Agent.Endpoints;
 using Thio_Universal_Agent.Logic;

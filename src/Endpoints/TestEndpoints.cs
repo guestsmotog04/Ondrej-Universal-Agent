@@ -2,8 +2,6 @@ using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Thio_Universal_Agent;
-using Thio_Universal_Agent.AI_API;
 using Thio_Universal_Agent.AI_API.Gemini;
 using Thio_Universal_Agent.Logic;
 

@@ -1,4 +1,4 @@
-namespace Thio_Universal_Agent.AI_API;
+namespace Thio_Universal_Agent;
 
 /// <summary>Optional per-request configuration overrides for AI provider calls.</summary>
 public record AiRequestOptions(int? MaxOutputTokens = null);

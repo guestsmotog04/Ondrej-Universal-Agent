@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
-using Thio_Universal_Agent.AI_API;
 
 namespace Thio_Universal_Agent.AI_API.Gemini;
 
