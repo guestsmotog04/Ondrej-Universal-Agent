@@ -693,26 +693,6 @@
                 const isActive = status.status === 'Running';
                 const isPausedStatus = status.isPaused;
 
-                // Replay completed steps from the server
-                const stepsRes = await fetch(`/api/agent/${storedSid}/steps`);
-                if (stepsRes.ok) {
-                    const rawSteps = await stepsRes.json();
-                    // Build minimal step objects matching the SSE shape so we can reuse handleStep
-                    for (const s of rawSteps) {
-                        const synthetic = {
-                            stepNumber: s.stepNumber,
-                            thought: s.thought,
-                            action: s.action,
-                            result: s.result,
-                            durationMs: s.durationMs,
-                            isTerminal: false,
-                        };
-                        replayStep(synthetic);
-                    }
-                }
-
-                stepCounter.textContent = status.stepCount ? `Step ${status.stepCount}` : '';
-
                 if (isActive) {
                     sessionStartTime = status.startedAt ? new Date(status.startedAt).getTime() : Date.now();
                     clearInterval(elapsedIntervalId);
@@ -731,17 +711,21 @@
                         isPaused = true;
                         btnPause.textContent = 'Resume';
                         btnPause.classList.add('resuming');
-                        setStatus('paused', 'Paused');
+                        setStatus('paused', debugEnabled ? 'Paused (Debug Mode)' : 'Paused');
                     }
-
-                    connectSSE(storedSid);
                 } else {
+                    // Show the final result immediately from the status response so it
+                    // appears before the SSE step history finishes replaying.
                     const sk = status.status.toLowerCase();
-                    if (status.totalDurationMs) elapsedTimer.textContent = formatElapsed(status.totalDurationMs);
+                    if (status.totalDurationMs != null) sessionStartTime = Date.now() - status.totalDurationMs;
                     setStatus(sk, status.status);
                     if (status.finalResult) showFinalResult(sk, status.finalResult);
                     resetControls();
                 }
+
+                // Connect SSE: for running sessions this streams live events; for
+                // terminated sessions it replays all steps and fires the done event.
+                connectStream(storedSid);
             } catch {
                 // Session expired (server restarted or id stale) — silently clear
                 localStorage.removeItem(SESSION_STORE_KEY);
@@ -765,6 +749,9 @@
         const cfg = getStoredConfig();
         const apiKey = cfg?.gemini?.apiKey || null;
         const model  = cfg?.gemini?.model  || null;
+
+        // Clear any previous session from storage so a fresh session takes over
+        localStorage.removeItem(SESSION_STORE_KEY);
 
         // Reset UI
         stepsData = [];
@@ -823,30 +810,35 @@
 
             const data = await res.json();
             sessionId = data.sessionId;
+            localStorage.setItem(SESSION_STORE_KEY, sessionId);
 
-            // Connect SSE
-            eventSource = new EventSource(`/api/agent/${sessionId}/stream`);
-            eventSource.onmessage = (e) => {
-                const msg = JSON.parse(e.data);
-                if (msg.type === 'stepStarting') handleStepStarting(msg);
-                else if (msg.type === 'subStep') handleSubStep(msg);
-                else if (msg.type === 'step') handleStep(msg);
-                else if (msg.type === 'paused') handlePaused();
-                else if (msg.type === 'resumed') handleResumed();
-                else if (msg.type === 'done') handleDone(msg);
-            };
-            eventSource.onerror = () => {
-                eventSource.close();
-                eventSource = null;
-                if (statusText.textContent.startsWith('Running')) {
-                    setStatus('error', 'Connection lost');
-                    resetControls();
-                }
-            };
+            connectStream(sessionId);
         } catch (err) {
             showFinalResult('error', 'Network error: ' + err.message);
             resetControls();
         }
+    }
+
+    function connectStream(id) {
+        if (eventSource) { eventSource.close(); eventSource = null; }
+        eventSource = new EventSource(`/api/agent/${id}/stream`);
+        eventSource.onmessage = (e) => {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'stepStarting') handleStepStarting(msg);
+            else if (msg.type === 'subStep') handleSubStep(msg);
+            else if (msg.type === 'step') handleStep(msg);
+            else if (msg.type === 'paused') handlePaused();
+            else if (msg.type === 'resumed') handleResumed();
+            else if (msg.type === 'done') handleDone(msg);
+        };
+        eventSource.onerror = () => {
+            eventSource.close();
+            eventSource = null;
+            if (statusText.textContent.startsWith('Running')) {
+                setStatus('error', 'Connection lost');
+                resetControls();
+            }
+        };
     }
 
     async function stopAgent() {
