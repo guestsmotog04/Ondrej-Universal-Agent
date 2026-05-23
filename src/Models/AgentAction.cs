@@ -54,7 +54,7 @@ public enum AgentActionAltMode
     None,
 
     /// <summary>For ClickDrag, becomes ClickDragCoords to provide exact coordiantes. <see cref="AgentActionKind.ClickDragCoords"/> </summary>
-    ExactCoords, 
+    ExactCoords,
 
     /// <summary>Instead of providing coordinates, use the cursor's current position without moving it.</summary>
     CurrentCursorPosition,

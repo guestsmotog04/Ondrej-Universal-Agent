@@ -62,7 +62,7 @@ public sealed class ScreenCoordinate(int AbsoluteX, int AbsoluteY, Screenshot Sc
     /// X position normalised to a 0–1000 scale across the width of the captured screenshot.
     /// Matches the coordinate space used by the AI and <see cref="CoordinatePrompter"/>.
     /// </summary>
-    public double NormalizedX => Screenshot.Width  == 0 ? 0 : (double)ImageX / Screenshot.Width  * Screenshot.DefaultNormalized;
+    public double NormalizedX => Screenshot.Width == 0 ? 0 : (double)ImageX / Screenshot.Width * Screenshot.DefaultNormalized;
 
     /// <summary>
     /// Y position normalised to a 0–1000 scale across the height of the captured screenshot.

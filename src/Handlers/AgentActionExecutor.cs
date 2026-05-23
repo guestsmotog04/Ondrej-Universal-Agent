@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Maui.Graphics;
 using System.Diagnostics;
 using System.Globalization;
 
@@ -45,22 +43,22 @@ public sealed partial class AgentActionExecutor(
                 AgentActionKind.ClickDrag or AgentActionKind.ClickDragCoords
                     => await ExecuteClickDragAsync(action, screenshot, debugLog, cancellationToken, onProgress).ConfigureAwait(false),
 
-                AgentActionKind.TypeText 
+                AgentActionKind.TypeText
                     => await ExecuteTypeTextAsync(action, debugLog, onProgress).ConfigureAwait(false),
 
-                AgentActionKind.KeyCombo 
+                AgentActionKind.KeyCombo
                     => await ExecuteKeyComboAsync(action, debugLog, onProgress).ConfigureAwait(false),
 
                 AgentActionKind.ScrollUp or AgentActionKind.ScrollDown
                     => await ExecuteScrollAsync(action, debugLog, onProgress).ConfigureAwait(false),
 
-                AgentActionKind.Wait 
+                AgentActionKind.Wait
                     => await ExecuteWaitAsync(action, debugLog, cancellationToken, onProgress).ConfigureAwait(false),
 
-                AgentActionKind.Done 
+                AgentActionKind.Done
                     => new ActionExecutionResult(true, "Agent declared goal achieved.", IsTerminal: true, GoalAchieved: true),
 
-                AgentActionKind.Fail 
+                AgentActionKind.Fail
                     => new ActionExecutionResult(true, $"Agent declared failure: {action.Reason}", IsTerminal: true, GoalAchieved: false),
 
                 _ => new ActionExecutionResult(false, $"Unknown action kind: {action.Kind}", IsTerminal: false, GoalAchieved: false),
@@ -321,21 +319,21 @@ public sealed partial class AgentActionExecutor(
                 startPy = startCoord.AbsoluteY;
             }
 
-                // Resolve end point
-                if (action.AltMode == AgentActionAltMode.CurrentCursorPositionEnd
-                    || action.AltMode == AgentActionAltMode.CurrentCursorPositionBoth)
-                {
-                    var (cx, cy) = inputProvider.GetCursorPosition();
-                    endPx = cx;
-                    endPy = cy;
-                    await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag End (Current Cursor)", Text: $"({endPx}, {endPy})")).ConfigureAwait(false);
-                }
-                else
-                {
-                    ScreenCoordinate endCoord = ScreenCoordinate.FromNormalizedCoordsString(destination, screenshot);
-                    endPx = endCoord.AbsoluteX;
-                    endPy = endCoord.AbsoluteY;
-                }
+            // Resolve end point
+            if (action.AltMode == AgentActionAltMode.CurrentCursorPositionEnd
+                || action.AltMode == AgentActionAltMode.CurrentCursorPositionBoth)
+            {
+                var (cx, cy) = inputProvider.GetCursorPosition();
+                endPx = cx;
+                endPy = cy;
+                await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag End (Current Cursor)", Text: $"({endPx}, {endPy})")).ConfigureAwait(false);
+            }
+            else
+            {
+                ScreenCoordinate endCoord = ScreenCoordinate.FromNormalizedCoordsString(destination, screenshot);
+                endPx = endCoord.AbsoluteX;
+                endPy = endCoord.AbsoluteY;
+            }
         }
         else
         {
@@ -391,9 +389,9 @@ public sealed partial class AgentActionExecutor(
 
     /// <summary>Resolves a target description to absolute screen coordinates using the coordinate prompter.</summary>
     private async Task<(ScreenCoordinate coord, long coordMs)> ResolveTargetCoordinatesAsync(
-        Screenshot screenshot, string target, 
+        Screenshot screenshot, string target,
         List<AgentDebugEntry>? debugLog,
-        CancellationToken cancellationToken, 
+        CancellationToken cancellationToken,
         Func<AgentDebugEntry, Task>? onProgress = null
         )
     {
@@ -458,7 +456,7 @@ public sealed partial class AgentActionExecutor(
 
         LogKeyCombo(logger, key ?? "[None]", ctrl, shift, alt, win);
         await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("OS Input Call",
-            Text: $"SendModKeyComboAsync(\"{key??"[None]"}\", ctrl={ctrl}, shift={shift}, alt={alt}, win={win})")).ConfigureAwait(false);
+            Text: $"SendModKeyComboAsync(\"{key ?? "[None]"}\", ctrl={ctrl}, shift={shift}, alt={alt}, win={win})")).ConfigureAwait(false);
 
         await inputProvider.SendModKeyComboAsync(key, ctrl ? true : null, shift ? true : null, alt ? true : null, win ? true : null).ConfigureAwait(false);
 

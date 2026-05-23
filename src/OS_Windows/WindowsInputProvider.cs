@@ -1,8 +1,5 @@
 ﻿// Thio-Universal-Agent/OS_Windows/WindowsInputProvider.cs
-using System;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-using static Thio_Universal_Agent.OS_Windows.WindowsInputProvider;
 
 namespace Thio_Universal_Agent.OS_Windows
 {
@@ -247,9 +244,9 @@ namespace Thio_Universal_Agent.OS_Windows
                     extended = keyChar.extended;
                     shift ??= keyChar.shiftState;
                 }
-            } 
+            }
             // Ensure something is pressed or just skip. Should have already been caught but we'll return early to avoid an unnecessary API call
-            else if (key == null && ctrl == false || shift == false || alt == false || win == false) 
+            else if (key == null && ctrl == false || shift == false || alt == false || win == false)
             {
                 return;
             }

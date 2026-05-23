@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Microsoft.Extensions.Logging;
 using Thio_Universal_Agent.Handlers;
 
 namespace Thio_Universal_Agent.Logic;
@@ -291,10 +290,10 @@ public sealed partial class AgentLoop(
     /// fails to locate the target, reports the failure back to the AI instead of crashing.
     /// </summary>
     private async Task<ActionExecutionResult> ExecuteWithTargetRecoveryAsync(
-        AgentAction action, Screenshot screenshot, 
-        AiConversation conversation, 
+        AgentAction action, Screenshot screenshot,
+        AiConversation conversation,
         CancellationToken ct,
-        List<AgentDebugEntry>? debugLog = null, 
+        List<AgentDebugEntry>? debugLog = null,
         Func<AgentDebugEntry, Task>? onProgress = null
         )
     {

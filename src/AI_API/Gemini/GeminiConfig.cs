@@ -48,7 +48,7 @@ public class GeminiConfig : IAiProviderConfig
     public GeminiConfig(IConfigurationSection section)
     {
         ApiKey = section["ApiKey"] is { } k && !string.IsNullOrWhiteSpace(k) ? k : null;
-        Model  = section["Model"] ?? Model;
+        Model = section["Model"] ?? Model;
 
         if (Enum.TryParse<GeminiMediaResolution>(section["MediaResolution"], ignoreCase: true, out var res))
             MediaResolution = res;

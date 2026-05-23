@@ -1,6 +1,4 @@
 ﻿// Thio-Universal-Agent/IInputProvider.cs
-using System.Threading.Tasks;
-
 namespace Thio_Universal_Agent
 {
     /// <summary>

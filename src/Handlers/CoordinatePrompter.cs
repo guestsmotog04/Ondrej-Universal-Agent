@@ -1,7 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc.ViewEngines;
-using Microsoft.Maui.Graphics;
+﻿using Microsoft.Maui.Graphics;
 using System.Globalization;
-using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 
 namespace Thio_Universal_Agent.Logic;
@@ -61,7 +59,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         }
 
         // Private methods
-        private static CoordResponseCode? StringToCode (string code)
+        private static CoordResponseCode? StringToCode(string code)
         {
             return code.ToUpper() switch
             {
@@ -95,7 +93,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         }
 
         // Overload allowing input of a single string. Still returns a list, but if it's not found it will be empty.
-        public static List<CoordResponseCode> GetFromStrings (string code)
+        public static List<CoordResponseCode> GetFromStrings(string code)
         {
             return GetFromStrings([code]);
         }
@@ -441,7 +439,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
                     ParseFailReasons.InvalidCoordinates => "Coordinates were found but are outside the bounds of the grid.",
                     _ => "An unknown parsing error occurred.",
                 };
-            } 
+            }
 
             // Use default recovery instructions if none are provided
             if (recoveryInstructions == null)
@@ -535,7 +533,8 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         string[] parts = response.Split(foundCommand.Code, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         // Splitting removes the string of the command. If there's nothing left, it means it was used standalone, so make sure it's a standalone code
-        if (parts.Length == 0 && !foundCommand.IsStandalone) {
+        if (parts.Length == 0 && !foundCommand.IsStandalone)
+        {
             return (
                 coordinates: null,
                 failReason: new ParseFailReason(ParseFailReasons.CorrectCommand_WrongStructure

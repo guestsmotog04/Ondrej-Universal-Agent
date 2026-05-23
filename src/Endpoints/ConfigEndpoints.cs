@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Text.Json;
-using Thio_Universal_Agent;
 
 namespace Thio_Universal_Agent.Endpoints;
 
@@ -63,7 +62,7 @@ internal static class ConfigEndpoints
         app.MapPost("/api/config", (JsonElement body, AppConfig appConfig) =>
         {
             if (body.TryGetProperty("gemini", out var geminiEl)) ApplyUpdates(appConfig.Gemini, geminiEl);
-            if (body.TryGetProperty("agent",  out var agentEl))  ApplyUpdates(appConfig.Agent,  agentEl);
+            if (body.TryGetProperty("agent", out var agentEl)) ApplyUpdates(appConfig.Agent, agentEl);
             return Results.Ok();
         });
     }
@@ -96,7 +95,7 @@ internal static class ConfigEndpoints
             else if (underlying.IsEnum)
             {
                 fieldType = "enum";
-                options   = Enum.GetNames(underlying);
+                options = Enum.GetNames(underlying);
             }
             else fieldType = "string";
 
@@ -163,16 +162,16 @@ internal static class ConfigEndpoints
 // ── DTOs (existing flat GET) ──────────────────────────────────────────────────
 
 internal sealed record AppConfigResponse(
-    AgentConfigDto  Agent,
+    AgentConfigDto Agent,
     GeminiConfigDto Gemini
 );
 
 internal sealed record AgentConfigDto(
-    int     SettleDelayMs,
+    int SettleDelayMs,
     string? CoordinateMode,
-    int?    MonitorIndex,
-    bool    EnableContextReset,
-    bool    StripHistoryImages
+    int? MonitorIndex,
+    bool EnableContextReset,
+    bool StripHistoryImages
 );
 
 internal sealed record GeminiConfigDto(
@@ -180,8 +179,8 @@ internal sealed record GeminiConfigDto(
     string? MediaResolution,
     double? Temperature,
     double? TopP,
-    int?    TopK,
-    int?    CoordinateMaxOutputTokens,
-    int?    ThinkingBudget,
+    int? TopK,
+    int? CoordinateMaxOutputTokens,
+    int? ThinkingBudget,
     string? ThinkingLevel
 );

@@ -17,14 +17,14 @@ public class WindowsSystemProvider : ISystemProvider
         return (v.Major, v.Minor, v.Build) switch
         {
             (10, 0, >= 22000) => "Windows 11",
-            (10, 0, _)        => "Windows 10",
-            (6,  3, _)        => "Windows 8.1",
-            (6,  2, _)        => "Windows 8",
-            (6,  1, _)        => "Windows 7",
-            (6,  0, _)        => "Windows Vista",
-            (5,  2, _)        => "Windows Server 2003",
-            (5,  1, _)        => "Windows XP",
-            _                 => $"Windows (NT {v.Major}.{v.Minor})"
+            (10, 0, _) => "Windows 10",
+            (6, 3, _) => "Windows 8.1",
+            (6, 2, _) => "Windows 8",
+            (6, 1, _) => "Windows 7",
+            (6, 0, _) => "Windows Vista",
+            (5, 2, _) => "Windows Server 2003",
+            (5, 1, _) => "Windows XP",
+            _ => $"Windows (NT {v.Major}.{v.Minor})"
         };
     }
 }

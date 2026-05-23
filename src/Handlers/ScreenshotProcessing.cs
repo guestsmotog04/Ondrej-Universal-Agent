@@ -373,7 +373,7 @@ public sealed partial class CoordinatePrompter
             rulerOffset = ComputeRulerOffset(imageWidth, maxLabelValue);
             canvasWidth = imageWidth + rulerOffset + labelBuffer;
             canvasHeight = imageHeight + rulerOffset + labelBuffer;
-        } 
+        }
         else
         {
             rulerOffset = 0;
@@ -402,7 +402,7 @@ public sealed partial class CoordinatePrompter
         canvas.RestoreState(); // Restores the transform/clip state, not entire canvas
 
         // We need to determine how to call the DrawRulerGrid function. Whether to tell it to draw labels at all.
-        bool gridLinesOnly; 
+        bool gridLinesOnly;
         if (noOuterBorder == true && innerLabels == false)
         {
             // If there is no outer border and labels are not drawn inside, then we can't fit any labels or tick marks without them being cut off.
@@ -497,7 +497,7 @@ public sealed partial class CoordinatePrompter
         // Shift to stay within source bounds
         if (x < 0) x = 0;
         if (y < 0) y = 0;
-        if (x + sideLength > sourceWidth)  x = sourceWidth - sideLength;
+        if (x + sideLength > sourceWidth) x = sourceWidth - sideLength;
         if (y + sideLength > sourceHeight) y = sourceHeight - sideLength;
 
         return new ViewRegion(x, y, sideLength, sideLength);

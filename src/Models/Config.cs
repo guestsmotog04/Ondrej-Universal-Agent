@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-using Thio_Universal_Agent.AI_API.Gemini;
+﻿using Thio_Universal_Agent.AI_API.Gemini;
 using Thio_Universal_Agent.Logic;
 
 namespace Thio_Universal_Agent;
@@ -76,7 +75,7 @@ public class AgentConfig
 public class AppConfig
 {
     public GeminiConfig Gemini { get; set; } = new();
-    public AgentConfig  Agent  { get; set; } = new();
+    public AgentConfig Agent { get; set; } = new();
 
     // ── Constructors ──────────────────────────────────────────────────────────
 
@@ -87,6 +86,6 @@ public class AppConfig
     public AppConfig(IConfiguration configuration)
     {
         Gemini = new GeminiConfig(configuration.GetSection("Gemini"));
-        Agent  = new AgentConfig(configuration.GetSection("Agent"));
+        Agent = new AgentConfig(configuration.GetSection("Agent"));
     }
 }
