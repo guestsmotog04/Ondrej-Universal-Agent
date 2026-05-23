@@ -1,3 +1,5 @@
+using Thio_Universal_Agent.Logic;
+
 namespace Thio_Universal_Agent.Handlers;
 
 /// <summary>
@@ -72,16 +74,39 @@ public static class AgentPromptBuilder
             FAIL "reason"
               Declare the goal cannot be achieved and explain why.
 
+            QUEUE:
+            <action 1>
+            <action 2>
+            ...
+              Queue up to {AgentActionParser.MaxQueuedActions} actions to execute back-to-back without waiting for a new screenshot between them.
+              Each queued line uses the exact same syntax as a normal ACTION: call.
+              Multi-line actions such as CLICK_DRAG with From:/To: lines are fully supported.
+              Use QUEUE: only when the actions are simple and predictable (e.g. click a field then type text).
+              The agent will stop the queue early if any action fails or is terminal (DONE/FAIL).
+              Example:
+              QUEUE:
+              LEFT_CLICK "the username text field"
+              TYPE_TEXT "admin"
+              KEY_COMBO tab
+
             ═══════════════════════════════════
             RESPONSE FORMAT (mandatory)
             ═══════════════════════════════════
 
-            You MUST respond in EXACTLY this format every single time:
+            You MUST respond in EXACTLY one of these two formats every single time:
 
+            Format A — single action:
             THOUGHT: <your reasoning about what you see on screen and what to do next>
             ACTION: <exactly one tool call from the list above>
 
-            Do NOT output anything else. Do NOT output multiple actions. Do NOT wrap in markdown or code blocks. Do NOT add extra commentary after the ACTION line.
+            Format B — queued actions (up to {AgentActionParser.MaxQueuedActions}):
+            THOUGHT: <your reasoning about what you see on screen and what to do next>
+            QUEUE:
+            <tool call 1>
+            <tool call 2>
+            ...
+
+            Do NOT output anything else. Do NOT mix ACTION: and QUEUE: in the same response. Do NOT wrap in markdown or code blocks. Do NOT add extra commentary after the last action line.
 
             ═══════════════════════════════════
             RULES
@@ -100,6 +125,7 @@ public static class AgentPromptBuilder
             11. If using a tool's COORDS mode (if available), give the coordinates normalized within {normDim}x{normDim} coordinates regardless of original aspect ratio or resolution. The true coordinates will be automatically calculated from this.
             12. Always visually confirm the action was taken to ensure it worked is possible. For example, the computer may have missed the action and it needs to be repeated.
             13. Prefer the use of COORDS mode for tools where available. If it repeatly fails to hit the correction location, try using natural language.
+            14. Queued actions should ONLY be used if the user interface is not expected to change from the actions. For example, checking multiple boxes in the same window, but NOT to close a menu then click something behind it.
 
             ═══════════════════════════════════
             YOUR GOAL
@@ -150,13 +176,38 @@ public static class AgentPromptBuilder
         return $"""
             Your previous response could not be parsed. Error: {parseError}
 
-            Please respond EXACTLY in this format:
+            Please respond in one of these EXACT formats:
 
+            Format A (single action):
             THOUGHT: <reasoning>
             ACTION: <one tool call>
 
-            The available tools are: LEFT_CLICK, RIGHT_CLICK, DOUBLE_CLICK, MIDDLE_CLICK, MOVE_MOUSE, TYPE_TEXT, KEY_COMBO, SCROLL_UP, SCROLL_DOWN, WAIT, DONE, FAIL.
+            Format B (queued actions):
+            THOUGHT: <reasoning>
+            QUEUE:
+            <tool call 1>
+            <tool call 2>
+
+            The available tools are: LEFT_CLICK, RIGHT_CLICK, DOUBLE_CLICK, MIDDLE_CLICK, MOVE_MOUSE, CLICK_DRAG, TYPE_TEXT, KEY_COMBO, SCROLL_UP, SCROLL_DOWN, WAIT, DONE, FAIL.
             """;
+    }
+
+    /// <summary>
+    /// Produces the feedback message sent to the AI after a <c>QUEUE:</c> batch of actions is executed,
+    /// summarising every action result in order and accompanying the new screenshot.
+    /// </summary>
+    public static string BuildQueuedFeedbackPrompt(IReadOnlyList<ActionExecutionResult> results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        if (results.Count == 1)
+            return BuildFeedbackPrompt(results[0]);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"Queued batch executed ({results.Count} action(s)):");
+        for (int i = 0; i < results.Count; i++)
+            sb.Append($" {i + 1}) {results[i].Summary}");
+        sb.Append(" Here is the updated screen. Continue toward the goal.");
+        return sb.ToString();
     }
 
     /// <summary>

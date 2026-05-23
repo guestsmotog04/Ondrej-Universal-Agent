@@ -93,10 +93,14 @@ public sealed record AgentAction(
     string? Reason = null
     );
 
-/// <summary>The AI's parsed response: a reasoning thought and exactly one action.</summary>
+/// <summary>The AI's parsed response: a reasoning thought and one or more queued actions.</summary>
 /// <param name="Thought">The AI's reasoning about what it sees and why it chose this action.</param>
-/// <param name="Action">The single tool invocation to execute.</param>
-public sealed record AgentParsedResponse(string Thought, AgentAction Action);
+/// <param name="Action">The first (or only) tool invocation to execute.</param>
+/// <param name="QueuedActions">
+/// When the AI used the <c>QUEUE:</c> syntax, contains all actions to execute in order (2–<see cref="AgentActionParser.MaxQueuedActions"/>).
+/// <see langword="null"/> for normal single-action responses.
+/// </param>
+public sealed record AgentParsedResponse(string Thought, AgentAction Action, IReadOnlyList<AgentAction>? QueuedActions = null);
 
 /// <summary>A single debug log entry captured when <see cref="Globals.ENABLE_TESTING"/> is true.</summary>
 /// <param name="Label">Short heading for this entry (e.g. "Prompt Sent to AI").</param>

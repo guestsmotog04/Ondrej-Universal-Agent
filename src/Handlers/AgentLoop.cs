@@ -125,64 +125,98 @@ public sealed partial class AgentLoop(
                     LogStepAction(logger, step, parsed.Thought, parsed.Action.Kind, FormatActionDetail(parsed.Action));
                     #pragma warning restore CA1873 // Avoid potentially expensive logging
 
-                // Notify the UI immediately so it can show what the agent is about to do
-                // before potentially slow work (e.g. coordinate resolution) begins.
-                var preview = new AgentStepPreview(step, parsed.Thought, parsed.Action);
-                await session.RaiseStepStartingAsync(preview).ConfigureAwait(false);
+                // Determine the ordered list of actions to execute this iteration.
+                // QueuedActions is non-null only when the AI used QUEUE: syntax with ≥2 actions.
+                IReadOnlyList<AgentAction> actionsToRun = parsed.QueuedActions ?? [parsed.Action];
 
-                // Create a progress callback that streams each executor debug entry to the UI in real-time.
-                // Always forward image entries; text-only entries are only forwarded in debug mode.
-                int currentStep = step;
+                var batchResults  = new List<ActionExecutionResult>(actionsToRun.Count);
+                bool batchTerminated = false;
+                long aiMsForFirstStep = lastAiResponseMs;
 
-                // ---- Local Function -----
-                async Task executorProgress(AgentDebugEntry entry)
+                for (int qi = 0; qi < actionsToRun.Count; qi++)
                 {
-                    if (!debugging && entry.ImageBase64 is null) return;
-                    await session.RaiseSubStepUpdateAsync(new AgentSubStep(currentStep, entry)).ConfigureAwait(false);
+                    ct.ThrowIfCancellationRequested();
+
+                    AgentAction currentAction = actionsToRun[qi];
+                    int currentStepNum = step + qi;
+
+                    // For queued actions beyond the first, create a fresh debug log per sub-step.
+                    List<AgentDebugEntry>? stepDebugLog = qi == 0 ? debugLog : (Globals.ENABLE_TESTING ? [] : null);
+
+                    string stepThought = qi == 0
+                        ? parsed.Thought
+                        : $"(Queued action {qi + 1} of {actionsToRun.Count})";
+
+                    // Notify the UI of the upcoming action.
+                    var preview = new AgentStepPreview(currentStepNum, stepThought, currentAction);
+                    await session.RaiseStepStartingAsync(preview).ConfigureAwait(false);
+
+                    // Progress callback streams executor debug entries to the UI in real-time.
+                    int capturedStepNum = currentStepNum;
+                    async Task executorProgress(AgentDebugEntry entry)
+                    {
+                        if (!Globals.ENABLE_TESTING && entry.ImageBase64 is null) return;
+                        await session.RaiseSubStepUpdateAsync(new AgentSubStep(capturedStepNum, entry)).ConfigureAwait(false);
+                    }
+
+                    var executeSw = Stopwatch.StartNew();
+                    ActionExecutionResult result = await ExecuteWithTargetRecoveryAsync(
+                        currentAction, screenshot, conversation, ct, stepDebugLog, executorProgress).ConfigureAwait(false);
+                    executeSw.Stop();
+
+                    if (Globals.ENABLE_TESTING)
+                        stepDebugLog!.Add(new AgentDebugEntry("Execution Result", Text: $"Success={result.Success} | {result.Summary}"));
+
+                    // For first action, stop the shared parse stopwatch; subsequent actions share 0ms parse time.
+                    if (qi == 0) stepStopwatch.Stop();
+                    long stepDurationMs = qi == 0 ? stepStopwatch.ElapsedMilliseconds : executeSw.ElapsedMilliseconds;
+
+                    var timings = new StepTimings(
+                        AiResponseMs:      qi == 0 ? aiMsForFirstStep : 0,
+                        ParseMs:           qi == 0 ? parseSw.ElapsedMilliseconds : 0,
+                        ExecutionMs:       executeSw.ElapsedMilliseconds,
+                        CoordResolutionMs: result.CoordResolutionMs);
+
+                    var agentStep = new AgentStep(currentStepNum, stepThought, currentAction, result,
+                        DateTimeOffset.UtcNow, stepDurationMs,
+                        stepDebugLog is { Count: > 0 } ? stepDebugLog : null,
+                        timings);
+                    session.Steps.Add(agentStep);
+                    await session.RaiseStepCompletedAsync(agentStep).ConfigureAwait(false);
+
+                    batchResults.Add(result);
+
+                    // Stop the queue early on terminal or failed actions.
+                    if (result.IsTerminal || !result.Success)
+                    {
+                        batchTerminated = result.IsTerminal;
+                        break;
+                    }
+
+                    // Settle between queued actions (skip for Wait since it already pauses).
+                    if (currentAction.Kind != AgentActionKind.Wait && qi < actionsToRun.Count - 1)
+                        await Task.Delay(_settleDelayMs, ct).ConfigureAwait(false);
                 }
-                // -------------------------
 
-                // Execute the action (executor adds its own debug entries)
-                var executeSw = Stopwatch.StartNew();
-                ActionExecutionResult result = await ExecuteWithTargetRecoveryAsync(
-                    parsed.Action, screenshot, conversation, ct, debugLog, executorProgress).ConfigureAwait(false);
-                executeSw.Stop();
+                // Advance the outer step counter to account for all actions consumed.
+                step += batchResults.Count - 1;
 
-                if (debugging)
-                    debugLog!.Add(new AgentDebugEntry("Execution Result", Text: $"Success={result.Success} | {result.Summary}"));
+                ActionExecutionResult lastResult = batchResults[^1];
 
-                stepStopwatch.Stop();
-
-                var timings = new StepTimings(
-                    AiResponseMs:      lastAiResponseMs,
-                    ParseMs:           parseSw.ElapsedMilliseconds,
-                    ExecutionMs:       executeSw.ElapsedMilliseconds,
-                    CoordResolutionMs: result.CoordResolutionMs);
-
-                // Record the step
-                var agentStep = new AgentStep(step, parsed.Thought, parsed.Action, result, DateTimeOffset.UtcNow,
-                    stepStopwatch.ElapsedMilliseconds,
-                    debugLog is { Count: > 0 } ? debugLog : null,
-                    timings);
-                session.Steps.Add(agentStep);
-                await session.RaiseStepCompletedAsync(agentStep).ConfigureAwait(false);
-
-                // Check for terminal actions
-                if (result.IsTerminal)
+                if (batchTerminated)
                 {
-                    session.Status = result.GoalAchieved ? AgentSessionStatus.Completed : AgentSessionStatus.Failed;
-                    session.FinalResult = result.Summary;
-                    LogSessionTerminated(logger, session.SessionId, step, result.Summary);
+                    session.Status = lastResult.GoalAchieved ? AgentSessionStatus.Completed : AgentSessionStatus.Failed;
+                    session.FinalResult = lastResult.Summary;
+                    LogSessionTerminated(logger, session.SessionId, step, lastResult.Summary);
                     return;
                 }
 
-                // Settle delay — let the UI update before next screenshot.
-                // Skip for Wait actions since the wait itself is already the settle time.
-                if (parsed.Action.Kind != AgentActionKind.Wait)
+                // Settle delay after the last action in the batch.
+                AgentAction lastAction = actionsToRun[batchResults.Count - 1];
+                if (lastAction.Kind != AgentActionKind.Wait)
                     await Task.Delay(_settleDelayMs, ct).ConfigureAwait(false);
 
                 // Honour a user-requested pause before doing any more work.
-                // The AI response in `response` is preserved across the pause so nothing is discarded.
                 await session.WaitIfPausedAsync(ct).ConfigureAwait(false);
 
                 // Observe: take a new screenshot
@@ -195,8 +229,10 @@ public sealed partial class AgentLoop(
                     conversation = await ResetContextAsync(conversation, session.Goal, screenshot, ct, carryOverDebug).ConfigureAwait(false);
                 }
 
-                // Feed the result + new screenshot back to the AI
-                string feedback = AgentPromptBuilder.BuildFeedbackPrompt(result);
+                // Feed all results + new screenshot back to the AI in a single message.
+                string feedback = batchResults.Count > 1
+                    ? AgentPromptBuilder.BuildQueuedFeedbackPrompt(batchResults)
+                    : AgentPromptBuilder.BuildFeedbackPrompt(lastResult);
 
                 var aiFeedbackSw = Stopwatch.StartNew();
                 response = await aiProvider.ContinueConversationAsync(

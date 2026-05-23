@@ -14,6 +14,13 @@ public static class AgentActionParser
 {
     private const string ThoughtPrefix = "THOUGHT:";
     private const string ActionPrefix = "ACTION:";
+    private const string QueuePrefix = "QUEUE:";
+
+    /// <summary>
+    /// Maximum number of actions the AI may queue in a single <c>QUEUE:</c> block.
+    /// Adjust this constant to change the cap.
+    /// </summary>
+    public const int MaxQueuedActions = 5;
 
     /// <summary> Attempts to parse the AI's response text into a thought and action. </summary>
     /// <returns>True if parsing succeeded; false otherwise.</returns>
@@ -28,13 +35,23 @@ public static class AgentActionParser
             return false;
         }
 
-        // Find the ACTION: line — it's the authoritative split point
+        // Detect which keyword comes first: ACTION: or QUEUE:
         int actionIndex = responseText.IndexOf(ActionPrefix, StringComparison.OrdinalIgnoreCase);
-        if (actionIndex < 0)
+        int queueIndex  = responseText.IndexOf(QueuePrefix,  StringComparison.OrdinalIgnoreCase);
+
+        bool hasQueue  = queueIndex  >= 0 && (actionIndex < 0 || queueIndex < actionIndex);
+        bool hasAction = actionIndex >= 0 && !hasQueue;
+
+        if (!hasQueue && !hasAction)
         {
-            error = "Response is missing the ACTION: line.";
+            error = "Response is missing the ACTION: or QUEUE: line.";
             return false;
         }
+
+        if (hasQueue)
+            return TryParseQueueResponse(responseText, queueIndex, out result, out error);
+
+        // ── Single-action path (original behavior) ────────────────────────────
 
         // Everything before ACTION: is the thought (strip optional THOUGHT: prefix)
         string thoughtRaw = responseText[..actionIndex].Trim();
@@ -57,6 +74,93 @@ public static class AgentActionParser
 
         result = new AgentParsedResponse(thought, action);
         return true;
+    }
+
+    /// <summary>
+    /// Parses a QUEUE: block that contains 1–<see cref="MaxQueuedActions"/> action lines.
+    /// </summary>
+    private static bool TryParseQueueResponse(
+        string responseText, int queueIndex,
+        [NotNullWhen(true)] out AgentParsedResponse? result,
+        [NotNullWhen(false)] out string? error)
+    {
+        result = null;
+
+        // Thought is everything before QUEUE:
+        string thoughtRaw = responseText[..queueIndex].Trim();
+        if (thoughtRaw.StartsWith(ThoughtPrefix, StringComparison.OrdinalIgnoreCase))
+            thoughtRaw = thoughtRaw[ThoughtPrefix.Length..].Trim();
+        string thought = thoughtRaw.Length > 0 ? thoughtRaw : "(no reasoning provided)";
+
+        // The queue payload is everything after "QUEUE:"
+        string queuePayload = responseText[(queueIndex + QueuePrefix.Length)..].Trim();
+        if (queuePayload.Length == 0)
+        {
+            error = $"QUEUE: block is present but empty. Provide 1 to {MaxQueuedActions} action lines.";
+            return false;
+        }
+
+        // Split into lines
+        string[] lines = queuePayload.Split(["\r\n", "\n", "\r"], StringSplitOptions.None);
+
+        // Group lines into per-action payloads.
+        // A new action starts whenever a line begins with a known tool token.
+        // Non-tool lines (e.g. CLICK_DRAG's From:/To: continuations) are appended to the current block.
+        var actionPayloads = new List<string>(MaxQueuedActions);
+        var currentBlock   = new System.Text.StringBuilder();
+
+        foreach (string line in lines)
+        {
+            string trimmed = line.Trim();
+            if (trimmed.Length == 0) continue;
+
+            if (IsToolLine(trimmed) && currentBlock.Length > 0)
+            {
+                actionPayloads.Add(currentBlock.ToString().Trim());
+                currentBlock.Clear();
+            }
+
+            currentBlock.AppendLine(trimmed);
+        }
+
+        if (currentBlock.Length > 0)
+            actionPayloads.Add(currentBlock.ToString().Trim());
+
+        if (actionPayloads.Count == 0)
+        {
+            error = "QUEUE: block contained no recognisable action lines.";
+            return false;
+        }
+
+        if (actionPayloads.Count > MaxQueuedActions)
+        {
+            error = $"QUEUE: block contains {actionPayloads.Count} actions but the maximum is {MaxQueuedActions}.";
+            return false;
+        }
+
+        var actions = new List<AgentAction>(actionPayloads.Count);
+        foreach (string payload in actionPayloads)
+        {
+            if (!TryParseActionLine(payload, out AgentAction? act, out error))
+                return false;
+            actions.Add(act);
+        }
+
+        result = new AgentParsedResponse(thought, actions[0], actions.Count > 1 ? actions : null);
+        error = null;
+        return true;
+    }
+
+    /// <summary>Returns true when <paramref name="line"/> starts with a recognised tool token.</summary>
+    private static bool IsToolLine(string line)
+    {
+        int spaceIdx  = line.IndexOf(' ');
+        string token  = spaceIdx >= 0 ? line[..spaceIdx] : line;
+        string normalized = token.Trim().ToUpperInvariant().Replace("-", "_");
+        return normalized is
+            "LEFT_CLICK" or "RIGHT_CLICK" or "DOUBLE_CLICK" or "MIDDLE_CLICK" or
+            "MOVE_MOUSE" or "CLICK_DRAG" or "TYPE_TEXT" or "KEY_COMBO" or
+            "SCROLL_UP" or "SCROLL_DOWN" or "WAIT" or "DONE" or "FAIL";
     }
 
     private static bool TryParseActionLine(string payload, [NotNullWhen(true)] out AgentAction? action, [NotNullWhen(false)] out string? error)
