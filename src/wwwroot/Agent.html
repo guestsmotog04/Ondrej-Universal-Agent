@@ -740,6 +740,7 @@
     btnStart.addEventListener('click', startAgent);
     btnPause.addEventListener('click', togglePause);
     btnStop.addEventListener('click', stopAgent);
+    btnNewSession.addEventListener('click', newSession);
     document.getElementById('btn-copy-steps').addEventListener('click', copySteps);
 
     async function startAgent() {
@@ -847,6 +848,41 @@
         try {
             await fetch(`/api/agent/${sessionId}/stop`, { method: 'POST' });
         } catch { /* best effort */ }
+    }
+
+    async function newSession() {
+        // Cancel any in-progress session first (best effort)
+        if (sessionId) {
+            try { await fetch(`/api/agent/${sessionId}/stop`, { method: 'POST' }); } catch { /* best effort */ }
+        }
+
+        // Drop the SSE connection and clear persisted session key
+        if (eventSource) { eventSource.close(); eventSource = null; }
+        localStorage.removeItem(SESSION_STORE_KEY);
+        sessionId = null;
+        sessionGoal = '';
+        sessionFinalResult = '';
+        isPaused = false;
+        stepsData = [];
+        stopElapsedTimer(null);
+        elapsedTimer.textContent = '';
+
+        // Reset all UI
+        stepLog.innerHTML = '';
+        promptBanner.style.display = 'none';
+        finalResultEl.className = 'final-result';
+        finalResultEl.style.display = 'none';
+        finalResultMsg.textContent = '';
+        finalResultTime.textContent = '';
+        currentThought.textContent = 'Waiting for agent to start...';
+        currentAction.style.display = 'none';
+        currentAction.textContent = '';
+        currentResult.textContent = '';
+        liveSubsteps.innerHTML = '';
+        stepCounter.textContent = '';
+        goalInput.value = '';
+        setStatus('idle', debugEnabled ? 'Idle (Debug Mode)' : 'Idle');
+        resetControls();
     }
 
     async function togglePause() {
