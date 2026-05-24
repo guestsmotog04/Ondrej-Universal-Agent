@@ -1,0 +1,158 @@
+/* ---- Body layout ---- */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ---- Header ---- */
+header {
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid #222;
+}
+
+header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: 0.3px;
+}
+
+header p {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #666;
+}
+
+/* ---- Status bar ---- */
+#status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 40px;
+    background-color: #161616;
+    border-bottom: 1px solid #1e1e1e;
+    font-size: 12px;
+    color: #555;
+}
+
+.status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #33aa66;
+    flex-shrink: 0;
+}
+
+/* ---- Main ---- */
+main {
+    flex: 1;
+    padding: 36px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+}
+
+section h2 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #555;
+    margin-bottom: 14px;
+}
+
+/* ---- Cards ---- */
+.card-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 18px 22px;
+    background-color: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    text-decoration: none;
+    color: inherit;
+    width: 220px;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+
+.card:hover {
+    background-color: #1f1f1f;
+    border-color: #4a9eff;
+}
+
+.card-icon { font-size: 20px; }
+
+.card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e0e0e0;
+}
+
+.card-desc {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.5;
+}
+
+.card-tag {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #4a9eff;
+    background-color: #0d2540;
+    border: 1px solid #1a3a5c;
+    border-radius: 3px;
+    padding: 2px 6px;
+    width: fit-content;
+}
+
+.card.placeholder {
+    opacity: 0.35;
+    pointer-events: none;
+    border-style: dashed;
+}
+
+.card.placeholder .card-tag {
+    color: #555;
+    background-color: transparent;
+    border-color: #333;
+}
+
+/* ---- Warning banner ---- */
+#warning-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 40px;
+    background-color: #1f1100;
+    border-bottom: 1px solid #5c3600;
+    font-size: 13px;
+    color: #cc8800;
+    line-height: 1.6;
+}
+
+#warning-banner .warning-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+#warning-banner strong {
+    color: #ffaa22;
+}
+
+#warning-banner ul {
+    margin: 4px 0 0 16px;
+    color: #aa7700;
+}

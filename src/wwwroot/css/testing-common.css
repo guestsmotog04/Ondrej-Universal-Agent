@@ -1,0 +1,31 @@
+/* ---- Shared styles for Testing pages ---- */
+
+/* Body layout (Screenshot + Chat use height:100vh/overflow:hidden; CoordPrompt overrides) */
+body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* ---- Header ---- */
+header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 20px;
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+}
+
+header h1 { font-size: 16px; font-weight: 600; color: #e0e0e0; }
+
+header a { font-size: 13px; color: #4a9eff; text-decoration: none; }
+header a:hover { text-decoration: underline; }
+
+/* ---- Bounce animation (used by Chat and CoordPrompt) ---- */
+@keyframes bounce {
+    0%, 80%, 100% { transform: scale(0.7); opacity: 0.35; }
+    40%            { transform: scale(1);   opacity: 1; }
+}
