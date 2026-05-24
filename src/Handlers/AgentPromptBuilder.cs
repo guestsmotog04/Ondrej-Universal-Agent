@@ -251,6 +251,46 @@ public static class AgentPromptBuilder
     }
 
     /// <summary>
+    /// Produces a guidance prefix to prepend to the next AI feedback message when the user has
+    /// sent one or more mid-session guidance messages.
+    /// </summary>
+    public static string BuildGuidancePrompt(IReadOnlyList<string> messages)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+
+        if (messages.Count == 1)
+            return $"[USER GUIDANCE] The user has sent you the following mid-session instruction — treat it as a high-priority directive that may override or adjust your current plan:\n\"{messages[0]}\"\n\n";
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("[USER GUIDANCE] The user has sent the following mid-session instructions — treat them as high-priority directives that may override or adjust your current plan:");
+        for (int i = 0; i < messages.Count; i++)
+            sb.AppendLine($"{i + 1}. \"{messages[i]}\"");
+        sb.AppendLine();
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Produces the prompt used when the user cancelled the AI's last planned action and provided guidance.
+    /// A fresh screenshot is included in the same message.
+    /// </summary>
+    public static string BuildActionCancelledPrompt(IReadOnlyList<string> guidanceMessages)
+    {
+        ArgumentNullException.ThrowIfNull(guidanceMessages);
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("[USER INTERRUPTION — ACTION CANCELLED]");
+        sb.AppendLine("The user cancelled your last planned action before it was executed.");
+        if (guidanceMessages.Count > 0)
+        {
+            sb.AppendLine("The user provided the following instruction(s):");
+            foreach (string msg in guidanceMessages)
+                sb.AppendLine($"  • {msg}");
+        }
+        sb.AppendLine("A fresh screenshot of the current screen state is attached.");
+        sb.AppendLine("Please reassess and decide your next action based on the user's instruction and the current screen.");
+        return sb.ToString();
+    }
+
+    /// <summary>
     /// Produces the summarization prompt used during episodic context resets.
     /// </summary>
     public static string BuildSummarizationPrompt()

@@ -185,6 +185,84 @@
             text-align: center;
         }
 
+        /* ---- Guidance panel ---- */
+        #guidance-panel {
+            padding: 8px 32px;
+            background: #0e1a0e;
+            border-bottom: 1px solid #1e3a1e;
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #guidance-panel label {
+            font-size: 11px;
+            color: #66aa66;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
+        #guidance-input {
+            flex: 1;
+            background: #141414;
+            border: 1px solid #2a3a2a;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 12px;
+            padding: 5px 10px;
+        }
+
+        #guidance-input:focus { outline: none; border-color: #44aa44; }
+
+        #btn-guidance {
+            background: #1e4a1e;
+            color: #88cc88;
+            border: 1px solid #2a5a2a;
+            border-radius: 5px;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        #btn-guidance:hover { background: #255a25; }
+        #btn-guidance:disabled { background: #161e16; color: #446044; cursor: default; border-color: #1e2e1e; }
+
+        .guidance-ack {
+            font-size: 11px;
+            color: #44aa44;
+            opacity: 0;
+            transition: opacity 0.4s;
+            white-space: nowrap;
+        }
+
+        .guidance-ack.show { opacity: 1; }
+
+        .guidance-cancel-wrap {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .guidance-cancel-wrap input[type=checkbox] {
+            accent-color: #cc4444;
+            width: 13px;
+            height: 13px;
+            cursor: pointer;
+        }
+
+        .guidance-cancel-wrap span {
+            font-size: 11px;
+            color: #cc7777;
+            font-weight: 600;
+        }
+
+        .guidance-cancel-wrap:hover span { color: #ee9999; }
+
         /* ---- Main Layout ---- */
         main {
             flex: 1;
@@ -339,6 +417,15 @@
             color: #666;
             font-size: 11px;
             margin-top: 2px;
+        }
+
+        .step-entry.cancelled {
+            border-left: 3px solid #885500;
+            opacity: 0.85;
+        }
+
+        .step-entry.cancelled .step-result {
+            color: #cc8833;
         }
 
         /* ---- Final Result Banner ---- */
@@ -678,6 +765,17 @@
     <span>seconds&hellip;</span>
 </div>
 
+<div id="guidance-panel">
+    <label for="guidance-input">&#128172; Guidance</label>
+    <input type="text" id="guidance-input" placeholder="Send a mid-session instruction to the AI&hellip;" />
+    <label class="guidance-cancel-wrap" title="Cancel the next pending action and redirect the AI with your guidance">
+        <input type="checkbox" id="guidance-cancel" />
+        <span>Cancel next action</span>
+    </label>
+    <button id="btn-guidance">Send</button>
+    <span class="guidance-ack" id="guidance-ack">&#10003; Queued</span>
+</div>
+
 <div class="prompt-banner" id="prompt-banner" style="display:none;">
     <details id="prompt-details">
         <summary>Goal&nbsp;<span class="prompt-preview" id="prompt-preview"></span></summary>
@@ -728,6 +826,10 @@
     const promptFull = document.getElementById('prompt-full');
     const elapsedTimer = document.getElementById('elapsed-timer');
     const modelBadge = document.getElementById('model-badge');
+    const guidancePanel = document.getElementById('guidance-panel');
+    const guidanceInput = document.getElementById('guidance-input');
+    const btnGuidance = document.getElementById('btn-guidance');
+    const guidanceAck = document.getElementById('guidance-ack');
 
     const SESSION_STORE_KEY = 'tua_session_id';
     const CONFIG_STORE_KEY  = 'tua_config_v1';
@@ -824,6 +926,8 @@
                     btnStop.disabled   = false;
                     goalInput.disabled = true;
                     monitorSelect.disabled = true;
+                    guidancePanel.style.display = 'flex';
+                    guidanceInput.value = '';
 
                     if (isPausedStatus) {
                         isPaused = true;
@@ -860,6 +964,8 @@
     btnStop.addEventListener('click', stopAgent);
     btnNewSession.addEventListener('click', newSession);
     document.getElementById('btn-copy-steps').addEventListener('click', copySteps);
+    btnGuidance.addEventListener('click', sendGuidance);
+    guidanceInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendGuidance(); });
 
     async function startAgent() {
         const goal = goalInput.value.trim();
@@ -909,6 +1015,8 @@
         btnStop.disabled = false;
         goalInput.disabled = true;
         monitorSelect.disabled = true;
+        guidancePanel.style.display = 'flex';
+        guidanceInput.value = '';
 
         try {
             const res = await fetch('/api/agent/start', {
@@ -951,6 +1059,7 @@
             else if (msg.type === 'paused') handlePaused();
             else if (msg.type === 'resumed') handleResumed();
             else if (msg.type === 'countdown') handleCountdown(msg);
+            else if (msg.type === 'guidanceQueued') handleGuidanceQueued(msg);
             else if (msg.type === 'done') handleDone(msg);
         };
         eventSource.onerror = () => {
@@ -1020,6 +1129,46 @@
         } catch { /* best effort */ } finally {
             btnPause.disabled = false;
         }
+    }
+
+    async function sendGuidance() {
+        if (!sessionId) return;
+        const msg = guidanceInput.value.trim();
+        if (!msg) return;
+        const cancelNext = document.getElementById('guidance-cancel').checked;
+        btnGuidance.disabled = true;
+        try {
+            const res = await fetch(`/api/agent/${sessionId}/guidance`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg, cancelNextAction: cancelNext }),
+            });
+            if (res.ok) {
+                guidanceInput.value = '';
+                document.getElementById('guidance-cancel').checked = false;
+                handleGuidanceQueued(msg, cancelNext);
+            } else {
+                const body = await res.json().catch(() => ({}));
+                const ackEl = document.getElementById('guidance-ack');
+                ackEl.textContent = '\u26a0 ' + (body.error ?? 'Failed to send');
+                ackEl.style.color = '#cc6644';
+                ackEl.classList.add('show');
+                setTimeout(() => { ackEl.classList.remove('show'); ackEl.style.color = ''; ackEl.textContent = '\u2713 Queued'; }, 3000);
+            }
+        } catch { /* network error — silently ignore */ } finally {
+            btnGuidance.disabled = false;
+        }
+    }
+
+    function handleGuidanceQueued(_msg, cancelNext) {
+        const ackEl = document.getElementById('guidance-ack');
+        ackEl.textContent = cancelNext ? '\u26a0 Queued (will cancel next action)' : '\u2713 Queued';
+        ackEl.style.color = cancelNext ? '#cc9944' : '';
+        ackEl.classList.remove('show');
+        // Force reflow so the transition re-fires if sent multiple times quickly
+        void ackEl.offsetWidth;
+        ackEl.classList.add('show');
+        setTimeout(() => { ackEl.classList.remove('show'); ackEl.style.color = ''; ackEl.textContent = '\u2713 Queued'; }, 2500);
     }
 
     function handlePaused() {
@@ -1103,7 +1252,8 @@
         currentResult.textContent = msg.result;
 
         const entry = document.createElement('div');
-        entry.className = 'step-entry';
+        const isCancelled = !msg.success && !msg.isTerminal && msg.result === 'Action cancelled by user.';
+        entry.className = 'step-entry' + (isCancelled ? ' cancelled' : '');
 
         let html = `
             <span class="step-num">#${msg.stepNumber}</span>
@@ -1310,6 +1460,8 @@
         btnStop.disabled = true;
         goalInput.disabled = false;
         monitorSelect.disabled = false;
+        guidancePanel.style.display = 'none';
+        guidanceAck.classList.remove('show');
     }
 
     function escapeHtml(str) {

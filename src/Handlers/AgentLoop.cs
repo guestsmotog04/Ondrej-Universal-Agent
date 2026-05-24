@@ -74,10 +74,6 @@ public sealed partial class AgentLoop(
             {
                 ct.ThrowIfCancellationRequested();
 
-                // If the user paused while the AI was responding, block here until resumed.
-                // After resume, a short countdown fires before the pending action executes.
-                await session.WaitIfPausedWithCountdownAsync(5, ct).ConfigureAwait(false);
-
                 bool debugging = appConfig.General.EnableDebugMode;
                 List<AgentDebugEntry>? debugLog = [];
 
@@ -135,8 +131,58 @@ public sealed partial class AgentLoop(
                 bool isBatch = actionsToRun.Count > 1;
 
                 // Emit ONE preview for the whole batch — UI shows the first action and a queue badge.
+                // This is intentionally done BEFORE the pause gate so the user can see the AI's
+                // plan even while the session is paused.
                 var preview = new AgentStepPreview(step, parsed.Thought, actionsToRun[0], actionsToRun.Count);
                 await session.RaiseStepStartingAsync(preview).ConfigureAwait(false);
+
+                // If the user paused while the AI was responding, block here until resumed.
+                // After resume, a short countdown fires before the pending action executes.
+                await session.WaitIfPausedWithCountdownAsync(5, ct).ConfigureAwait(false);
+
+                // If the user submitted guidance with "cancel next action" while paused, skip
+                // execution entirely, emit a cancelled step to the log, then redirect the AI.
+                if (session.ConsumeCancelNextAction())
+                {
+                    var cancelledResult = new ActionExecutionResult(false, "Action cancelled by user.", IsTerminal: false, GoalAchieved: false);
+                    var cancelTimings = new StepTimings(lastAiResponseMs, parseSw.ElapsedMilliseconds, 0, null);
+                    var cancelledStep = new AgentStep(step, parsed.Thought, actionsToRun[0], cancelledResult,
+                        DateTimeOffset.UtcNow, parseSw.ElapsedMilliseconds,
+                        debugLog is { Count: > 0 } ? debugLog : null, cancelTimings, null);
+                    session.Steps.Add(cancelledStep);
+                    await session.RaiseStepCompletedAsync(cancelledStep).ConfigureAwait(false);
+
+                    // Take a fresh screenshot so the AI has current state.
+                    screenshot = screenProvider.CaptureScreen();
+                    screenshot.Processed = CoordinatePrompter.CreateFullGridOverlayImage(screenshot.Original);
+
+                    // Drain guidance (may include the cancellation message itself) and tell the AI.
+                    var cancelGuidance = new List<string>();
+                    session.DrainGuidance(cancelGuidance);
+                    string cancelFeedback = AgentPromptBuilder.BuildActionCancelledPrompt(cancelGuidance);
+
+                    if (debugging) lastPromptSent = cancelFeedback;
+
+                    var cancelAiSw = Stopwatch.StartNew();
+                    response = await aiProvider.ContinueConversationAsync(
+                        conversation, cancelFeedback, screenshot.Processed, ScreenMimeType, ct).ConfigureAwait(false);
+                    cancelAiSw.Stop();
+                    lastAiResponseMs = cancelAiSw.ElapsedMilliseconds;
+
+                    if (!response.Success)
+                    {
+                        session.Status = AgentSessionStatus.Error;
+                        session.FinalResult = $"AI request failed after user cancellation at step {step}: {response.ErrorMessage}";
+                        LogAiCallFailed(logger, step, session.SessionId, response.ErrorMessage);
+                        return;
+                    }
+
+                    if (debugging) lastRawResponse = response.Text;
+
+                    // Restart the loop iteration with the fresh AI response.
+                    step--;  // counter will be incremented by the for-loop
+                    continue;
+                }
 
                 // Single progress callback — all sub-steps are attributed to the parent step number.
                 async Task executorProgress(AgentDebugEntry entry)
@@ -243,6 +289,12 @@ public sealed partial class AgentLoop(
                 string feedback = batchResults.Count > 1
                     ? AgentPromptBuilder.BuildQueuedFeedbackPrompt(batchResults)
                     : AgentPromptBuilder.BuildFeedbackPrompt(lastResult);
+
+                // Prepend any user guidance messages that arrived since the last step.
+                // (Skip if cancel-next-action was already set — that path drains guidance separately.)
+                var guidanceMessages = new List<string>();
+                if (!session.HasCancelNextAction && session.DrainGuidance(guidanceMessages))
+                    feedback = AgentPromptBuilder.BuildGuidancePrompt(guidanceMessages) + feedback;
 
                 var aiFeedbackSw = Stopwatch.StartNew();
                 response = await aiProvider.ContinueConversationAsync(

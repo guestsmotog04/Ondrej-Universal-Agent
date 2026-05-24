@@ -80,4 +80,21 @@ public sealed class AgentSessionManager(
         session.Resume();
         return true;
     }
+
+    /// <summary>
+    /// Enqueues a user guidance message to be injected into the next AI feedback call.
+    /// Returns false if the session is not found or is no longer active.
+    /// </summary>
+    public bool SendGuidance(string sessionId, string message, bool cancelNextAction = false)
+    {
+        if (!_sessions.TryGetValue(sessionId, out AgentSession? session))
+            return false;
+
+        if (session.Status != AgentSessionStatus.Running && !session.IsPaused)
+            return false;
+
+        logger.LogInformation("User guidance queued for session {SessionId} (cancelNext={CancelNext}).", sessionId, cancelNextAction);
+        session.EnqueueGuidance(message, cancelNextAction);
+        return true;
+    }
 }

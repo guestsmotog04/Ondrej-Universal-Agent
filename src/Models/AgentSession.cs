@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace Thio_Universal_Agent;
 
 /// <summary>Tracks the lifecycle status of an agent session.</summary>
@@ -200,6 +202,59 @@ public sealed class AgentSession
         Func<AgentStep, Task>? handler = OnStepCompleted;
         if (handler is not null)
             await handler(step).ConfigureAwait(false);
+    }
+
+    // ── User Guidance ───────────────────────────────────────────────────────────
+
+    private readonly ConcurrentQueue<string> _pendingGuidance = new();
+
+    /// <summary>Fired when the user enqueues a guidance message, so the SSE stream can acknowledge it.</summary>
+    public event Func<string, Task>? OnGuidanceQueued;
+
+    /// <summary>Enqueues a freeform guidance message to be injected into the next AI feedback call.</summary>
+    /// <param name="message">The guidance text.</param>
+    /// <param name="cancelNextAction">
+    /// When true, signals <see cref="AgentLoop"/> to skip the next pending action and redirect
+    /// the AI with this guidance instead of executing it.
+    /// </param>
+    public void EnqueueGuidance(string message, bool cancelNextAction = false)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        _pendingGuidance.Enqueue(message);
+        if (cancelNextAction)
+            _cancelNextAction = true;
+        _ = OnGuidanceQueued?.Invoke(message);
+    }
+
+    private volatile bool _cancelNextAction;
+
+    /// <summary>True if a cancel-next-action request is pending (peek without consuming).</summary>
+    public bool HasCancelNextAction => _cancelNextAction;
+
+    /// <summary>
+    /// Atomically reads and clears the <see cref="HasCancelNextAction"/> flag.
+    /// Returns true if a cancellation was pending.
+    /// </summary>
+    internal bool ConsumeCancelNextAction()
+    {
+        if (!_cancelNextAction) return false;
+        _cancelNextAction = false;
+        return true;
+    }
+
+    /// <summary>
+    /// Drains all pending guidance messages into <paramref name="messages"/>.
+    /// Returns true if at least one message was dequeued.
+    /// </summary>
+    internal bool DrainGuidance(List<string> messages)
+    {
+        bool any = false;
+        while (_pendingGuidance.TryDequeue(out string? msg))
+        {
+            messages.Add(msg);
+            any = true;
+        }
+        return any;
     }
 
     private readonly TaskCompletionSource _terminated = new(TaskCreationOptions.RunContinuationsAsynchronously);

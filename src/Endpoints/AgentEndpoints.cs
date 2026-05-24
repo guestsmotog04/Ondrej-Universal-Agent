@@ -182,11 +182,24 @@ internal static class AgentEndpoints
                 }
             }
 
+            async Task OnGuidanceQueued(string message)
+            {
+                try
+                {
+                    await WriteGuidanceQueuedEventAsync(httpContext.Response, message, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    tcs.TrySetResult();
+                }
+            }
+
             session.OnSubStepUpdate += OnSubStepUpdate;
             session.OnStepStarting += OnStepStarting;
             session.OnStepCompleted += OnStep;
             session.OnPauseChanged += OnPauseChanged;
             session.OnResumeCountdown += OnResumeCountdown;
+            session.OnGuidanceQueued += OnGuidanceQueued;
 
             try
             {
@@ -215,6 +228,7 @@ internal static class AgentEndpoints
                 session.OnStepCompleted -= OnStep;
                 session.OnPauseChanged -= OnPauseChanged;
                 session.OnResumeCountdown -= OnResumeCountdown;
+                session.OnGuidanceQueued -= OnGuidanceQueued;
             }
         });
 
@@ -237,6 +251,16 @@ internal static class AgentEndpoints
         {
             bool found = manager.ResumeSession(sessionId);
             return found ? Results.NoContent() : Results.NotFound(new { error = "Session not found." });
+        });
+
+        // Enqueue a user guidance message for the running/paused session
+        group.MapPost("/{sessionId}/guidance", (string sessionId, GuidanceRequest req, AgentSessionManager manager) =>
+        {
+            if (string.IsNullOrWhiteSpace(req.Message))
+                return Results.BadRequest(new { error = "Message is required." });
+
+            bool found = manager.SendGuidance(sessionId, req.Message, req.CancelNextAction ?? false);
+            return found ? Results.NoContent() : Results.NotFound(new { error = "Session not found or not active." });
         });
     }
 
@@ -342,6 +366,19 @@ internal static class AgentEndpoints
         await response.Body.FlushAsync(ct).ConfigureAwait(false);
     }
 
+    private static async Task WriteGuidanceQueuedEventAsync(HttpResponse response, string message, CancellationToken ct)
+    {
+        var payload = new
+        {
+            type = "guidanceQueued",
+            message,
+        };
+
+        string json = JsonSerializer.Serialize(payload, JsonOptions);
+        await response.WriteAsync($"data: {json}\n\n", ct).ConfigureAwait(false);
+        await response.Body.FlushAsync(ct).ConfigureAwait(false);
+    }
+
     private static async Task WriteTerminalEventAsync(HttpResponse response, AgentSession session, CancellationToken ct)
     {
         var payload = new
@@ -399,3 +436,4 @@ internal static class AgentEndpoints
 }
 
 file record AgentStartRequest(string? Goal, string? ApiKey, string? Model, int? MonitorIndex);
+file record GuidanceRequest(string? Message, bool? CancelNextAction);
