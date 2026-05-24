@@ -75,6 +75,7 @@
 </main>
 
 <script>
+    // @ts-check
     // ── Type definitions ──────────────────────────────────────────────────────
 
     /**
@@ -129,62 +130,34 @@
      * @typedef {{ goal: string, status: string, finalResult?: string, steps: CopyOutputStep[] }} CopyOutput
      */
 
-    /** @type {HTMLSelectElement} */
-    const monitorSelect = /** @type {HTMLSelectElement} */ (document.getElementById('monitor-select'));
-    /** @type {HTMLInputElement} */
-    const goalInput = /** @type {HTMLInputElement} */ (document.getElementById('goal-input'));
-    /** @type {HTMLButtonElement} */
-    const btnStart = /** @type {HTMLButtonElement} */ (document.getElementById('btn-start'));
-    /** @type {HTMLDivElement} */
-    const countdownBanner = /** @type {HTMLDivElement} */ (document.getElementById('countdown-banner'));
-    /** @type {HTMLSpanElement} */
-    const countdownNum = /** @type {HTMLSpanElement} */ (document.getElementById('countdown-num'));
-    /** @type {HTMLButtonElement} */
-    const btnPause = /** @type {HTMLButtonElement} */ (document.getElementById('btn-pause'));
-    /** @type {HTMLButtonElement} */
-    const btnStop = /** @type {HTMLButtonElement} */ (document.getElementById('btn-stop'));
-    /** @type {HTMLButtonElement} */
-    const btnNewSession = /** @type {HTMLButtonElement} */ (document.getElementById('btn-new-session'));
-    /** @type {HTMLDivElement} */
-    const statusDot = /** @type {HTMLDivElement} */ (document.getElementById('status-dot'));
-    /** @type {HTMLSpanElement} */
-    const statusText = /** @type {HTMLSpanElement} */ (document.getElementById('status-text'));
-    /** @type {HTMLSpanElement} */
-    const stepCounter = /** @type {HTMLSpanElement} */ (document.getElementById('step-counter'));
-    /** @type {HTMLDivElement} */
-    const finalResultEl = /** @type {HTMLDivElement} */ (document.getElementById('final-result'));
-    /** @type {HTMLSpanElement} */
-    const finalResultMsg = /** @type {HTMLSpanElement} */ (document.getElementById('final-result-msg'));
-    /** @type {HTMLSpanElement} */
-    const finalResultTime = /** @type {HTMLSpanElement} */ (document.getElementById('final-result-time'));
-    /** @type {HTMLDivElement} */
-    const currentThought = /** @type {HTMLDivElement} */ (document.getElementById('current-thought'));
-    /** @type {HTMLDivElement} */
-    const currentAction = /** @type {HTMLDivElement} */ (document.getElementById('current-action'));
-    /** @type {HTMLDivElement} */
-    const currentResult = /** @type {HTMLDivElement} */ (document.getElementById('current-result'));
-    /** @type {HTMLDivElement} */
-    const liveSubsteps = /** @type {HTMLDivElement} */ (document.getElementById('live-substeps'));
-    /** @type {HTMLDivElement} */
-    const stepLog = /** @type {HTMLDivElement} */ (document.getElementById('step-log'));
-    /** @type {HTMLDivElement} */
-    const promptBanner = /** @type {HTMLDivElement} */ (document.getElementById('prompt-banner'));
-    /** @type {HTMLSpanElement} */
-    const promptPreview = /** @type {HTMLSpanElement} */ (document.getElementById('prompt-preview'));
-    /** @type {HTMLDivElement} */
-    const promptFull = /** @type {HTMLDivElement} */ (document.getElementById('prompt-full'));
-    /** @type {HTMLSpanElement} */
-    const elapsedTimer = /** @type {HTMLSpanElement} */ (document.getElementById('elapsed-timer'));
-    /** @type {HTMLSpanElement} */
-    const modelBadge = /** @type {HTMLSpanElement} */ (document.getElementById('model-badge'));
-    /** @type {HTMLDivElement} */
-    const guidancePanel = /** @type {HTMLDivElement} */ (document.getElementById('guidance-panel'));
-    /** @type {HTMLInputElement} */
-    const guidanceInput = /** @type {HTMLInputElement} */ (document.getElementById('guidance-input'));
-    /** @type {HTMLButtonElement} */
-    const btnGuidance = /** @type {HTMLButtonElement} */ (document.getElementById('btn-guidance'));
-    /** @type {HTMLSpanElement} */
-    const guidanceAck = /** @type {HTMLSpanElement} */ (document.getElementById('guidance-ack'));
+    const monitorSelect  =  /** @type {HTMLSelectElement} */  (document.getElementById('monitor-select'));
+    const goalInput       = /** @type {HTMLInputElement} */   (document.getElementById('goal-input'));
+    const btnStart        = /** @type {HTMLButtonElement} */  (document.getElementById('btn-start'));
+    const countdownBanner = /** @type {HTMLDivElement} */     (document.getElementById('countdown-banner'));
+    const countdownNum    = /** @type {HTMLSpanElement} */    (document.getElementById('countdown-num'));
+    const btnPause        = /** @type {HTMLButtonElement} */  (document.getElementById('btn-pause'));
+    const btnStop         = /** @type {HTMLButtonElement} */  (document.getElementById('btn-stop'));
+    const btnNewSession   = /** @type {HTMLButtonElement} */  (document.getElementById('btn-new-session'));
+    const statusDot       = /** @type {HTMLDivElement} */     (document.getElementById('status-dot'));
+    const statusText      = /** @type {HTMLSpanElement} */    (document.getElementById('status-text'));
+    const stepCounter     = /** @type {HTMLSpanElement} */    (document.getElementById('step-counter'));
+    const finalResultEl   = /** @type {HTMLDivElement} */     (document.getElementById('final-result'));
+    const finalResultMsg  = /** @type {HTMLSpanElement} */    (document.getElementById('final-result-msg'));
+    const finalResultTime = /** @type {HTMLSpanElement} */    (document.getElementById('final-result-time'));
+    const currentThought  = /** @type {HTMLDivElement} */     (document.getElementById('current-thought'));
+    const currentAction   = /** @type {HTMLDivElement} */     (document.getElementById('current-action'));
+    const currentResult   = /** @type {HTMLDivElement} */     (document.getElementById('current-result'));
+    const liveSubsteps    = /** @type {HTMLDivElement} */     (document.getElementById('live-substeps'));
+    const stepLog         = /** @type {HTMLDivElement} */     (document.getElementById('step-log'));
+    const promptBanner    = /** @type {HTMLDivElement} */     (document.getElementById('prompt-banner'));
+    const promptPreview   = /** @type {HTMLSpanElement} */    (document.getElementById('prompt-preview'));
+    const promptFull      = /** @type {HTMLDivElement} */     (document.getElementById('prompt-full'));
+    const elapsedTimer    = /** @type {HTMLSpanElement} */    (document.getElementById('elapsed-timer'));
+    const modelBadge      = /** @type {HTMLSpanElement} */    (document.getElementById('model-badge'));
+    const guidancePanel   = /** @type {HTMLDivElement} */     (document.getElementById('guidance-panel'));
+    const guidanceInput   = /** @type {HTMLInputElement} */   (document.getElementById('guidance-input'));
+    const btnGuidance     = /** @type {HTMLButtonElement} */  (document.getElementById('btn-guidance'));
+    const guidanceAck     = /** @type {HTMLSpanElement} */    (document.getElementById('guidance-ack'));
 
     const SESSION_STORE_KEY = 'tua_session_id';
     const CONFIG_STORE_KEY  = 'tua_config_v1';
@@ -221,8 +194,8 @@
     let isPaused = false;
     /** @type {number | null} */
     let sessionStartTime = null;
-    /** @type {ReturnType<typeof setInterval> | null} */
-    let elapsedIntervalId = null;
+    /** @type {ReturnType<typeof setInterval> | undefined} */
+    let elapsedIntervalId;
 
     // ── Boot: fetch server config + try to resume a stored session ──────────
     (async () => {
@@ -281,7 +254,7 @@
                     sessionStartTime = status.startedAt ? new Date(status.startedAt).getTime() : Date.now();
                     clearInterval(elapsedIntervalId);
                     elapsedIntervalId = setInterval(() => {
-                        elapsedTimer.textContent = formatElapsed(Date.now() - sessionStartTime);
+                        elapsedTimer.textContent = formatElapsed(Date.now() - (sessionStartTime ?? 0));
                     }, 500);
 
                     setStatus('running', debugEnabled ? 'Running (Debug Mode)' : 'Running');
@@ -327,10 +300,10 @@
     btnPause.addEventListener('click', togglePause);
     btnStop.addEventListener('click', stopAgent);
     btnNewSession.addEventListener('click', newSession);
-    document.getElementById('btn-copy-steps').addEventListener('click', copySteps);
+    document.getElementById('btn-copy-steps')?.addEventListener('click', copySteps);
     btnGuidance.addEventListener('click', sendGuidance);
     guidanceInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendGuidance(); });
-    document.getElementById('btn-skip-countdown').addEventListener('click', skipCountdown);
+    document.getElementById('btn-skip-countdown')?.addEventListener('click', skipCountdown);
 
     /** @returns {Promise<void>} */
     async function startAgent() {
@@ -355,13 +328,13 @@
         elapsedTimer.textContent = '0:00';
         clearInterval(elapsedIntervalId);
         elapsedIntervalId = setInterval(() => {
-            elapsedTimer.textContent = formatElapsed(Date.now() - sessionStartTime);
+            elapsedTimer.textContent = formatElapsed(Date.now() - (sessionStartTime ?? 0));
         }, 500);
         stepLog.innerHTML = '';
         promptPreview.textContent = goal.length > 80 ? goal.slice(0, 80) + '…' : goal;
         promptFull.textContent = goal;
         promptBanner.style.display = '';
-        document.getElementById('prompt-details').removeAttribute('open');
+        document.getElementById('prompt-details')?.removeAttribute('open');
         finalResultEl.className = 'final-result';
         finalResultMsg.textContent = '';
         finalResultTime.textContent = '';
@@ -403,13 +376,13 @@
                 return;
             }
 
-            const data = await res.json();
+            const data = /** @type {StartAgentResponse} */ (await res.json());
             sessionId = data.sessionId;
             localStorage.setItem(SESSION_STORE_KEY, sessionId);
 
             connectStream(sessionId);
         } catch (err) {
-            showFinalResult('error', 'Network error: ' + err.message);
+            showFinalResult('error', 'Network error: ' + (err instanceof Error ? err.message : String(err)));
             resetControls();
         }
     }
@@ -433,9 +406,9 @@
             else if (msg.type === 'done') handleDone(msg);
         };
         eventSource.onerror = () => {
-            eventSource.close();
+            eventSource?.close();
             eventSource = null;
-            if (statusText.textContent.startsWith('Running')) {
+            if (statusText.textContent?.startsWith('Running')) {
                 setStatus('error', 'Connection lost');
                 resetControls();
             }
@@ -532,11 +505,10 @@
                 // The SSE guidanceQueued event will fire shortly and add the log entry + ack badge.
             } else {
                 const body = await res.json().catch(() => ({}));
-                const ackEl = document.getElementById('guidance-ack');
-                ackEl.textContent = '\u26a0 ' + (body.error ?? 'Failed to send');
-                ackEl.style.color = '#cc6644';
-                ackEl.classList.add('show');
-                setTimeout(() => { ackEl.classList.remove('show'); ackEl.style.color = ''; ackEl.textContent = '\u2713 Queued'; }, 3000);
+                guidanceAck.textContent = '\u26a0 ' + (body.error ?? 'Failed to send');
+                guidanceAck.style.color = '#cc6644';
+                guidanceAck.classList.add('show');
+                setTimeout(() => { guidanceAck.classList.remove('show'); guidanceAck.style.color = ''; guidanceAck.textContent = '\u2713 Queued'; }, 3000);
             }
         } catch { /* network error — silently ignore */ } finally {
             btnGuidance.disabled = false;
@@ -561,13 +533,12 @@
         stepLog.scrollTop = stepLog.scrollHeight;
 
         // Flash the ack badge (only meaningful when called from the local sendGuidance path)
-        const ackEl = document.getElementById('guidance-ack');
-        ackEl.textContent = isCancel ? '\u26a0 Queued (will cancel next action)' : '\u2713 Queued';
-        ackEl.style.color = isCancel ? '#cc9944' : '';
-        ackEl.classList.remove('show');
-        void ackEl.offsetWidth;
-        ackEl.classList.add('show');
-        setTimeout(() => { ackEl.classList.remove('show'); ackEl.style.color = ''; ackEl.textContent = '\u2713 Queued'; }, 2500);
+        guidanceAck.textContent = isCancel ? '\u26a0 Queued (will cancel next action)' : '\u2713 Queued';
+        guidanceAck.style.color = isCancel ? '#cc9944' : '';
+        guidanceAck.classList.remove('show');
+        void guidanceAck.offsetWidth;
+        guidanceAck.classList.add('show');
+        setTimeout(() => { guidanceAck.classList.remove('show'); guidanceAck.style.color = ''; guidanceAck.textContent = '\u2713 Queued'; }, 2500);
     }
 
     /** @returns {void} */
@@ -594,7 +565,7 @@
      */
     function handleCountdown(msg) {
         if (msg.seconds > 0) {
-            countdownNum.textContent = msg.seconds;
+            countdownNum.textContent = String(msg.seconds);
             countdownBanner.style.display = 'flex';
         } else {
             countdownBanner.style.display = 'none';
@@ -790,26 +761,27 @@
     /** @returns {Promise<void>} */
     async function copySteps() {
         if (stepsData.length === 0) return;
-        const btn = document.getElementById('btn-copy-steps');
+        const btn = /** @type {HTMLButtonElement} */ (document.getElementById('btn-copy-steps'));
 
+        /** @type {CopyOutput} */
         const output = {
             goal: sessionGoal,
-            status: statusText.textContent,
+            status: statusText.textContent ?? '',
             ...(sessionFinalResult ? { finalResult: sessionFinalResult } : {}),
             steps: stepsData.map(s => {
-                const step = {
+                const step = /** @type {CopyOutputStep} */ ({
                     stepNumber: s.stepNumber,
                     thought: s.thought,
                     action: s.action,
                     result: s.result,
                     durationMs: s.durationMs,
-                };
+                });
                 if (s.timings) step.timings = s.timings;
                 if (s.isTerminal) step.isTerminal = true;
                 if (s.goalAchieved != null) step.goalAchieved = s.goalAchieved;
                 if (s.debugLog?.length) {
                     step.debugLog = s.debugLog.map(d => {
-                        const entry = { label: d.label };
+                        const entry = /** @type {CopyDebugEntry} */ ({ label: d.label });
                         if (d.text) entry.text = d.text;
                         if (d.imageBase64) entry.image = '[image data omitted]';
                         return entry;
@@ -841,7 +813,7 @@
      */
     function stopElapsedTimer(totalDurationMs) {
         clearInterval(elapsedIntervalId);
-        elapsedIntervalId = null;
+        elapsedIntervalId = undefined;
         const finalMs = totalDurationMs != null ? totalDurationMs
             : sessionStartTime ? Date.now() - sessionStartTime : null;
         if (finalMs != null) {
