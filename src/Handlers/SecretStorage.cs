@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.IO;
 
 namespace Thio_Universal_Agent;
@@ -13,70 +14,83 @@ public interface ISecretProvider
 }
 
 /// <summary>
-/// Provides cross-platform encrypted storage for secrets (such as API Keys) using AES encryption and PBKDF2-SHA256 key derivation.
-/// The user will provide a password that will be hashed and used to derive a key. The encrypted file will be saved/read by the backend.
-/// The user will have the option to store the hash in the browser and remember it. 
-/// This way the actual encrypted file is separated from the browser to protect against XSS and rudimentary stealers, even if user sets to remember the password hash.
+/// Provides cross-platform encrypted storage for secrets (such as API keys) using AES encryption and PBKDF2-SHA256 key derivation.
+/// The user provides a password that is hashed client-side and sent to the backend to derive an AES key.
+/// All secrets are stored together in a single vault file (<c>secrets_vault.json</c>) under the OS LocalApplicationData folder.
+/// Each entry in the vault is independently AES-encrypted (with its own random IV) so that key names and existence
+/// can be queried without a password, while values remain protected. Because all entries share one vault file,
+/// a single vault password governs access to every secret — there is no way to end up with different passwords per entry.
 /// </summary>
 /// <remarks>
-/// Stores encrypted secrets in the local application data folder under 'ThioUniversalAgent'. Each secret
-/// is encrypted using AES with a key derived from the provided password hash through PBKDF2 with 100,000 iterations.
-/// The implementation is compatible with Windows, macOS, and Linux platforms.
+/// The vault file resides at <c>%LocalAppData%/ThioUniversalAgent/secrets_vault.json</c> (or the platform equivalent).
+/// Key names are stored in plaintext as JSON properties; values are stored as Base64-encoded AES ciphertext alongside
+/// their IV. The AES key is derived from the provided password hash via PBKDF2 with 100,000 iterations of SHA-256.
 /// </remarks>
 public class SecretsHandler : ISecretProvider
 {
     private static readonly byte[] AppSalt = Encoding.UTF8.GetBytes("ThioAgent_CrossPlatform_Salt_V1!");
+    private const string VaultFileName = "secrets_vault.json";
 
-    // Automatically resolves to the correct AppData folder on Windows, Mac, and Linux
-    private readonly string _appDataFolder;
+    private readonly string _vaultFilePath;
+    private readonly Lock _fileLock = new();
 
     public SecretsHandler()
     {
+        // Automatically resolves to the correct AppData folder on Windows, Mac, and Linux
         string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        _appDataFolder = Path.Combine(localAppData, "ThioUniversalAgent");
-
-        // Ensure the directory exists before we try to read/write to it
-        Directory.CreateDirectory(_appDataFolder);
+        string appDataFolder = Path.Combine(localAppData, "ThioUniversalAgent");
+        Directory.CreateDirectory(appDataFolder);
+        _vaultFilePath = Path.Combine(appDataFolder, VaultFileName);
     }
 
     public void SaveSecret(string keyName, string plainTextSecret, string passwordHash)
     {
-        string filePath = Path.Combine(_appDataFolder, $"{keyName}.dat");
-        byte[] entropy = Encoding.UTF8.GetBytes(passwordHash);
+        byte[] key = DeriveKey(Encoding.UTF8.GetBytes(passwordHash));
 
         using Aes aes = Aes.Create();
-        aes.Key = DeriveKey(entropy);
+        aes.Key = key;
         aes.GenerateIV();
 
-        using FileStream fileStream = new FileStream(filePath, FileMode.Create);
-        fileStream.Write(aes.IV, 0, aes.IV.Length);
+        byte[] ciphertext;
+        using (MemoryStream ms = new())
+        {
+            using CryptoStream cs = new(ms, aes.CreateEncryptor(), CryptoStreamMode.Write);
+            byte[] secretBytes = Encoding.UTF8.GetBytes(plainTextSecret);
+            cs.Write(secretBytes);
+            cs.FlushFinalBlock();
+            ciphertext = ms.ToArray();
+        }
 
-        using CryptoStream cryptoStream = new CryptoStream(fileStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
-        byte[] secretBytes = Encoding.UTF8.GetBytes(plainTextSecret);
-        cryptoStream.Write(secretBytes, 0, secretBytes.Length);
+        lock (_fileLock)
+        {
+            Dictionary<string, VaultEntry> vault = ReadVaultFile();
+            vault[keyName] = new VaultEntry(Convert.ToBase64String(aes.IV), Convert.ToBase64String(ciphertext));
+            WriteVaultFile(vault);
+        }
     }
 
     public string? LoadSecret(string keyName, string passwordHash)
     {
-        string filePath = Path.Combine(_appDataFolder, $"{keyName}.dat");
-        if (!File.Exists(filePath)) return null;
+        Dictionary<string, VaultEntry> vault;
+        lock (_fileLock)
+            vault = ReadVaultFile();
 
-        byte[] entropy = Encoding.UTF8.GetBytes(passwordHash);
-
-        using FileStream fileStream = new FileStream(filePath, FileMode.Open);
-
-        using Aes aes = Aes.Create();
-        byte[] iv = new byte[aes.BlockSize / 8];
-        if (fileStream.Read(iv, 0, iv.Length) != iv.Length)
+        if (!vault.TryGetValue(keyName, out VaultEntry? entry))
             return null;
 
-        aes.Key = DeriveKey(entropy);
+        byte[] key = DeriveKey(Encoding.UTF8.GetBytes(passwordHash));
+        byte[] iv = Convert.FromBase64String(entry.IV);
+        byte[] ciphertext = Convert.FromBase64String(entry.Ciphertext);
+
+        using Aes aes = Aes.Create();
+        aes.Key = key;
         aes.IV = iv;
 
         try
         {
-            using CryptoStream cryptoStream = new CryptoStream(fileStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
-            using StreamReader reader = new StreamReader(cryptoStream, Encoding.UTF8);
+            using MemoryStream ms = new(ciphertext);
+            using CryptoStream cs = new(ms, aes.CreateDecryptor(), CryptoStreamMode.Read);
+            using StreamReader reader = new(cs, Encoding.UTF8);
             return reader.ReadToEnd();
         }
         catch (CryptographicException)
@@ -87,19 +101,39 @@ public class SecretsHandler : ISecretProvider
 
     public bool SecretExists(string keyName)
     {
-        string filePath = Path.Combine(_appDataFolder, $"{keyName}.dat");
-        return File.Exists(filePath);
+        lock (_fileLock)
+            return ReadVaultFile().ContainsKey(keyName);
     }
 
     public void DeleteSecret(string keyName)
     {
-        string filePath = Path.Combine(_appDataFolder, $"{keyName}.dat");
-        if (File.Exists(filePath))
-            File.Delete(filePath);
+        lock (_fileLock)
+        {
+            Dictionary<string, VaultEntry> vault = ReadVaultFile();
+            if (vault.Remove(keyName))
+                WriteVaultFile(vault);
+        }
+    }
+
+    private Dictionary<string, VaultEntry> ReadVaultFile()
+    {
+        if (!File.Exists(_vaultFilePath))
+            return [];
+
+        string json = File.ReadAllText(_vaultFilePath);
+        return JsonSerializer.Deserialize<Dictionary<string, VaultEntry>>(json) ?? [];
+    }
+
+    private void WriteVaultFile(Dictionary<string, VaultEntry> vault)
+    {
+        string json = JsonSerializer.Serialize(vault, new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText(_vaultFilePath, json);
     }
 
     private static byte[] DeriveKey(byte[] passwordHashEntropy)
     {
         return Rfc2898DeriveBytes.Pbkdf2(passwordHashEntropy, AppSalt, 100_000, HashAlgorithmName.SHA256, 32);
     }
+
+    private sealed record VaultEntry(string IV, string Ciphertext);
 }
