@@ -42,6 +42,7 @@ The system operates on an **Observe-Think-Act** loop, managed asynchronously and
 * `CoordinatePrompter.cs`: Complex visual logic. Determines exactly *where* to click based on the AI's target description. Uses modes like `Zoom` (drawing a grid over the screen) or `DirectAutoNormalize` (translating 1000x1000 normalized coordinates back to physical pixels).
 * `ScreenshotProcessing.cs` (part of `CoordinatePrompter`): Handles SkiaSharp image manipulation, drawing grids, crosshairs, and cropping for zoom modes.
 * `AgentPromptBuilder.cs`: Constructs the massive system prompt teaching the AI its tools, rules, and formats.
+* `SecretStorage.cs`: Cross-platform encrypted storage for API keys and other secrets. Defines the `ISecretProvider` interface (`SaveSecret`, `LoadSecret`, `SecretExists`, `DeleteSecret`) and its `SecretsHandler` implementation. Each secret is stored as an AES-encrypted `.dat` file in the OS `LocalApplicationData` folder under `ThioUniversalAgent/`. The encryption key is derived from a **password hash** (never the raw password) via PBKDF2-SHA256 with 100,000 iterations. The hash is computed client-side in the browser using `SubtleCrypto` SHA-256, so the plaintext password never reaches the server. The hash can optionally be persisted in `localStorage` for auto-unlock on next visit. This design keeps the encrypted files isolated on the server's filesystem, separate from the browser, guarding against XSS and rudimentary credential stealers even when the "remember hash" option is enabled.
 
 ### `/Models/` (Data Structures)
 * `AgentSession.cs`: Holds state for a running task (Goal, Status, History, Cancel tokens, Pause states).
@@ -56,9 +57,10 @@ The system operates on an **Observe-Think-Act** loop, managed asynchronously and
 ### `/Endpoints/` (Minimal APIs)
 * `AgentEndpoints.cs`: Routes for `/api/agent/...` (start, stop, status). Houses the complex SSE (`text/event-stream`) logic for real-time frontend updates.
 * `ConfigEndpoints.cs`: Generates dynamic JSON schema via reflection from `ConfigField` attributes, allowing the frontend to build a settings menu automatically.
+* `SecretsEndpoints.cs`: Four routes under `/api/secrets/` that front `ISecretProvider` — `POST /save` (encrypt and persist), `POST /load` (decrypt and return, 401 on wrong password / 404 if not found), `GET /{key}/exists` (existence check without decryption), and `DELETE /{key}` (permanently remove a secret file). Secret keys follow the `{sectionKey}_{fieldKey}` convention (e.g. `gemini_apiKey`).
 * `TestEndpoints.cs`: Isolated `/api/test/...` endpoints purely for the web-based debugging tools.
 
 ### `/wwwroot/` (Frontend)
 * `Agent.html`: The main control panel. Connects to the SSE stream to display live thoughts, actions, and debug images.
-* `Config.html`: Dynamically renders inputs based on the backend schema. Saves to `localStorage` and syncs with the C# backend.
+* `Config.html`: Dynamically renders inputs based on the backend schema. Saves non-secret settings to `localStorage` and syncs with the C# backend. API key fields (`IsPassword = true`) are managed separately via the **API Key Vault** UI: the user enters a vault password, it is hashed client-side with `SubtleCrypto` SHA-256, and the hash is used to save/load secrets through `SecretsEndpoints`. On page load the vault attempts auto-unlock if a remembered hash is present in `localStorage`. The "Reset + Erase API Keys" button additionally calls `DELETE /api/secrets/{key}` for each known secret before resetting other settings.
 * `/Testing/`: Sandboxed HTML pages for testing Chat, Screenshot bounding boxes, and Coordinate prompting in isolation.
