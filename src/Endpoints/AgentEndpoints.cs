@@ -253,6 +253,16 @@ internal static class AgentEndpoints
             return found ? Results.NoContent() : Results.NotFound(new { error = "Session not found." });
         });
 
+        // Skip the resume countdown (proceed to execution immediately)
+        group.MapPost("/{sessionId}/skip-countdown", (string sessionId, AgentSessionManager manager) =>
+        {
+            AgentSession? session = manager.GetSession(sessionId);
+            if (session is null)
+                return Results.NotFound(new { error = "Session not found." });
+            session.SkipCountdown();
+            return Results.NoContent();
+        });
+
         // Enqueue a user guidance message for the running/paused session
         group.MapPost("/{sessionId}/guidance", (string sessionId, GuidanceRequest req, AgentSessionManager manager) =>
         {

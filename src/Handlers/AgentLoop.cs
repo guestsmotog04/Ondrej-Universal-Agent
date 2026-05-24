@@ -149,8 +149,12 @@ public sealed partial class AgentLoop(
                 await session.RaiseStepStartingAsync(preview).ConfigureAwait(false);
 
                 // If the user paused while the AI was responding, block here until resumed.
-                // After resume, a short countdown fires before the pending action executes.
-                await session.WaitIfPausedWithCountdownAsync(5, ct).ConfigureAwait(false);
+                // Skip the countdown entirely when the next action is already flagged for cancellation —
+                // there's nothing pending to execute, so there's no need to give the user preparation time.
+                if (session.HasCancelNextAction)
+                    await session.WaitIfPausedAsync(ct).ConfigureAwait(false);
+                else
+                    await session.WaitIfPausedWithCountdownAsync(5, ct).ConfigureAwait(false);
 
                 // If the user submitted guidance with "cancel next action" while paused, skip
                 // execution entirely, emit a cancelled step to the log, then redirect the AI.

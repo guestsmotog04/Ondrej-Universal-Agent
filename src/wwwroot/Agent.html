@@ -185,6 +185,21 @@
             text-align: center;
         }
 
+        #btn-skip-countdown {
+            margin-left: 10px;
+            padding: 3px 12px;
+            background: #2a2000;
+            border: 1px solid #5a4a00;
+            border-radius: 4px;
+            color: #d0b040;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            letter-spacing: 0.4px;
+        }
+
+        #btn-skip-countdown:hover { background: #3a2e00; color: #f0d060; border-color: #7a6800; }
+
         /* ---- Guidance panel ---- */
         #guidance-panel {
             padding: 8px 32px;
@@ -813,6 +828,7 @@
     <span>▶ Resuming in</span>
     <span class="countdown-num" id="countdown-num">5</span>
     <span>seconds&hellip;</span>
+    <button id="btn-skip-countdown" title="Skip countdown and execute now">Skip</button>
 </div>
 
 <div id="guidance-panel">
@@ -1016,6 +1032,7 @@
     document.getElementById('btn-copy-steps').addEventListener('click', copySteps);
     btnGuidance.addEventListener('click', sendGuidance);
     guidanceInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendGuidance(); });
+    document.getElementById('btn-skip-countdown').addEventListener('click', skipCountdown);
 
     async function startAgent() {
         const goal = goalInput.value.trim();
@@ -1127,6 +1144,13 @@
         btnStop.disabled = true;
         try {
             await fetch(`/api/agent/${sessionId}/stop`, { method: 'POST' });
+        } catch { /* best effort */ }
+    }
+
+    async function skipCountdown() {
+        if (!sessionId) return;
+        try {
+            await fetch(`/api/agent/${sessionId}/skip-countdown`, { method: 'POST' });
         } catch { /* best effort */ }
     }
 

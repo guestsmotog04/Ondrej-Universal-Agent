@@ -126,28 +126,42 @@ public sealed class AgentSession
 
             await pauseTask.WaitAsync(ct).ConfigureAwait(false);
 
-            // Count down, but bail out immediately if the user pauses again mid-countdown.
-            bool repaused = false;
-            for (int i = countdownSeconds; i >= 1; i--)
-            {
-                await RaiseResumeCountdownAsync(i).ConfigureAwait(false);
-                await Task.Delay(1000, ct).ConfigureAwait(false);
+                _skipCountdown = false;
 
-                lock (_pauseLock)
+                // Count down, but bail out immediately if the user pauses again mid-countdown or skips.
+                bool repaused = false;
+                for (int i = countdownSeconds; i >= 1; i--)
                 {
-                    if (_pauseTcs is not null)
+                    if (_skipCountdown) break;
+
+                    await RaiseResumeCountdownAsync(i).ConfigureAwait(false);
+                    await Task.Delay(1000, ct).ConfigureAwait(false);
+
+                    if (_skipCountdown) break;
+
+                    lock (_pauseLock)
                     {
-                        repaused = true;
-                        break;
+                        if (_pauseTcs is not null)
+                        {
+                            repaused = true;
+                            break;
+                        }
                     }
                 }
-            }
 
             // Always send 0 to hide the banner, then either loop back to wait or return.
             await RaiseResumeCountdownAsync(0).ConfigureAwait(false);
             if (!repaused) return;
         }
     }
+
+    private volatile bool _skipCountdown;
+
+    /// <summary>
+    /// Signals the active resume countdown to skip immediately, proceeding to execution without waiting.
+    /// Has no effect if no countdown is currently in progress.
+    /// </summary>
+    public void SkipCountdown() => _skipCountdown = true;
 
     /// <summary>
     /// Fired once per second during the post-resume countdown with the number of seconds remaining.
