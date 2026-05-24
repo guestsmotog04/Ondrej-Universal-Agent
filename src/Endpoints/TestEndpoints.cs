@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
+using Thio_Universal_Agent.AI_API.Anthropic;
 using Thio_Universal_Agent.AI_API.Gemini;
+using Thio_Universal_Agent.AI_API.OpenAI;
 
 namespace Thio_Universal_Agent.Endpoints;
 
@@ -40,7 +41,7 @@ internal static class TestEndpoints
 
         // Thin HTTP shell for the browser-based test UI.
         // Production agent code calls IAiProvider directly in C# — never through this endpoint.
-        group.MapPost("/chat", async (TestChatRequest req, IAiProvider aiProvider, IHttpClientFactory httpClientFactory, IConfiguration config, AppConfig appConfig, CancellationToken ct) =>
+        group.MapPost("/chat", async (TestChatRequest req, IAiProvider aiProvider, IHttpClientFactory httpClientFactory, AppConfig appConfig, ILoggerFactory loggerFactory, CancellationToken ct) =>
         {
             if (!CheckTestingEnabled(appConfig))
                 return Results.Problem(TestingDisabledErrorMsg);
@@ -50,71 +51,25 @@ internal static class TestEndpoints
                 bool hasImage = !string.IsNullOrWhiteSpace(req.ImageBase64);
                 bool hasPrompt = !string.IsNullOrWhiteSpace(req.Prompt);
                 bool isNewConversation = string.IsNullOrWhiteSpace(req.ConversationId);
+                bool isKeyOverride = !string.IsNullOrWhiteSpace(req.ApiKey);
 
-                if (!string.IsNullOrWhiteSpace(req.ApiKey))
-                {
-                    // Key override path: lets the test page use any key without touching appsettings.json.
-                    var model = string.IsNullOrWhiteSpace(req.Model) ? config["Gemini:Model"] ?? "gemini-2.0-flash" : req.Model;
-                    var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={req.ApiKey}";
-
-                    var userParts = new List<object>();
-                    if (hasPrompt)
-                        userParts.Add(new { text = req.Prompt });
-                    if (hasImage)
-                        userParts.Add(new { inlineData = new { mimeType = req.ImageMimeType ?? "image/jpeg", data = req.ImageBase64 } });
-
-                    string conversationId;
-                    TestConversationSession session;
-                    if (isNewConversation)
-                    {
-                        conversationId = Guid.NewGuid().ToString("N");
-                        session = new TestConversationSession(IsApiKeyMode: true);
-                        _conversations[conversationId] = session;
-                    }
-                    else
-                    {
-                        conversationId = req.ConversationId!;
-                        if (!_conversations.TryGetValue(conversationId, out var found))
-                            return Results.Problem("Conversation not found or expired. Please clear and start a new conversation.");
-                        if (!found.IsApiKeyMode)
-                            return Results.Problem("Cannot switch from server-key mode to API-key override mid-conversation. Please clear and start a new conversation.");
-                        session = found;
-                    }
-
-                    var newUserTurn = new { role = "user", parts = userParts.ToArray() };
-                    var contents = new List<object>(session.RawHistory) { newUserTurn };
-
-                    using var client = httpClientFactory.CreateClient();
-                    using var httpResponse = await client.PostAsJsonAsync(url, new { contents }, ct);
-                    var raw = await httpResponse.Content.ReadAsStringAsync(ct);
-
-                    if (!httpResponse.IsSuccessStatusCode)
-                        return Results.Problem($"HTTP {(int)httpResponse.StatusCode}: {raw}");
-
-                    using var doc = JsonDocument.Parse(raw);
-                    var text = doc.RootElement
-                        .GetProperty("candidates")[0]
-                        .GetProperty("content")
-                        .GetProperty("parts")[0]
-                        .GetProperty("text")
-                        .GetString() ?? string.Empty;
-
-                    session.RawHistory.Add(newUserTurn);
-                    session.RawHistory.Add(new { role = "model", parts = new[] { new { text } } });
-
-                    return Results.Ok(new { text, conversationId });
-                }
-
-                // IAiProvider path
                 if (isNewConversation)
                 {
+                    // Resolve provider: key-override creates a throwaway instance; otherwise use the injected singleton.
+                    IAiProvider provider = isKeyOverride
+                        ? CreateOverrideProvider(req.Provider ?? appConfig.General.ActiveProvider, req.ApiKey!, req.Model, appConfig, httpClientFactory, loggerFactory)
+                        : aiProvider;
+                    AiProviderType resolvedProviderType = isKeyOverride
+                        ? (req.Provider ?? appConfig.General.ActiveProvider)
+                        : appConfig.General.ActiveProvider;
+
                     // StartConversationAsync is text-only; first messages with an image are sent as a one-shot.
                     if (hasImage)
                     {
                         if (!hasPrompt)
                             return Results.Problem("Please include text with your first image message.");
 
-                        var result = await aiProvider.SendPromptWithImageAsync(
+                        var result = await provider.SendPromptWithImageAsync(
                             req.Prompt!, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/jpeg", ct);
                         return result.Success
                             ? Results.Ok(new { result.Text, conversationId = (string?)null })
@@ -124,32 +79,43 @@ internal static class TestEndpoints
                     if (!hasPrompt)
                         return Results.Problem("Prompt is required to start a conversation.");
 
-                    var (conversation, response) = await aiProvider.StartConversationAsync(req.Prompt!, ct);
+                    var (conversation, response) = await provider.StartConversationAsync(req.Prompt!, ct);
                     if (!response.Success)
                         return Results.Problem(response.ErrorMessage);
 
                     var newId = Guid.NewGuid().ToString("N");
-                    _conversations[newId] = new TestConversationSession(IsApiKeyMode: false) { Conversation = conversation };
+                    _conversations[newId] = isKeyOverride
+                        ? new TestConversationSession { Conversation = conversation, OverrideApiKey = req.ApiKey, OverrideProviderType = resolvedProviderType, OverrideModel = req.Model }
+                        : new TestConversationSession { Conversation = conversation };
                     return Results.Ok(new { response.Text, conversationId = newId });
                 }
                 else
                 {
                     if (!_conversations.TryGetValue(req.ConversationId!, out var session))
                         return Results.Problem("Conversation not found or expired. Please clear and start a new conversation.");
-                    if (session.IsApiKeyMode)
-                        return Results.Problem("Cannot switch from API-key override mode to server-key mode mid-conversation. Please clear and start a new conversation.");
                     if (session.Conversation == null)
                         return Results.Problem("Invalid conversation state. Please clear and start a new conversation.");
 
+                    // Guard against mid-conversation provider-mode switches.
+                    if (session.IsApiKeyMode && !isKeyOverride)
+                        return Results.Problem("Cannot switch from API-key override mode to server-key mode mid-conversation. Please clear and start a new conversation.");
+                    if (!session.IsApiKeyMode && isKeyOverride)
+                        return Results.Problem("Cannot switch from server-key mode to API-key override mid-conversation. Please clear and start a new conversation.");
+
+                    // For key-override sessions, recreate the provider from the credentials stored at conversation start.
+                    IAiProvider provider = session.IsApiKeyMode
+                        ? CreateOverrideProvider(session.OverrideProviderType, session.OverrideApiKey!, session.OverrideModel, appConfig, httpClientFactory, loggerFactory)
+                        : aiProvider;
+
                     AiResponse response;
                     if (hasImage && hasPrompt)
-                        response = await aiProvider.ContinueConversationAsync(
+                        response = await provider.ContinueConversationAsync(
                             session.Conversation, req.Prompt!, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/jpeg", ct);
                     else if (hasImage)
-                        response = await aiProvider.ContinueConversationAsync(
+                        response = await provider.ContinueConversationAsync(
                             session.Conversation, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/jpeg", ct);
                     else
-                        response = await aiProvider.ContinueConversationAsync(session.Conversation, req.Prompt!, ct);
+                        response = await provider.ContinueConversationAsync(session.Conversation, req.Prompt!, ct);
 
                     return response.Success
                         ? Results.Ok(new { response.Text, conversationId = req.ConversationId })
@@ -211,19 +177,10 @@ internal static class TestEndpoints
                 CoordinatePrompter prompter;
                 if (!string.IsNullOrWhiteSpace(req.ApiKey))
                 {
-                    // TODO: Change the way default model is handled here instead of hard coding
-                    var overrideConfig = new AppConfig
-                    {
-                        Gemini = new GeminiConfig
-                        {
-                            ApiKey = req.ApiKey,
-                            Model  = string.IsNullOrWhiteSpace(req.Model) ? appConfig.Gemini.Model : req.Model
-                        }
-                    };
-                    var httpClient = httpClientFactory.CreateClient();
-                    var logger = loggerFactory.CreateLogger<GeminiProvider>();
-                    IAiProvider provider = new GeminiProvider(httpClient, overrideConfig, logger);
-                    prompter = new CoordinatePrompter(provider, overrideConfig);
+                    var providerType = req.Provider ?? appConfig.General.ActiveProvider;
+                    var overrideConfig = new AppConfig { General = appConfig.General, Agent = appConfig.Agent };
+                    IAiProvider provider = CreateOverrideProvider(providerType, req.ApiKey!, req.Model, appConfig, httpClientFactory, loggerFactory);
+                    prompter = new CoordinatePrompter(provider, appConfig);
                 }
                 else
                 {
@@ -266,17 +223,49 @@ internal static class TestEndpoints
         .DisableAntiforgery();
     }
 
-    private sealed class TestConversationSession(bool IsApiKeyMode)
+    private sealed class TestConversationSession
     {
-        public bool IsApiKeyMode { get; } = IsApiKeyMode;
         public AiConversation? Conversation { get; set; }
-        public List<object> RawHistory { get; } = [];
+
+        // Only populated for key-override sessions; null means "use injected IAiProvider".
+        public string? OverrideApiKey { get; init; }
+        public AiProviderType OverrideProviderType { get; init; }
+        public string? OverrideModel { get; init; }
+
+        public bool IsApiKeyMode => OverrideApiKey is not null;
+    }
+
+    /// <summary>
+    /// Creates a throwaway <see cref="IAiProvider"/> using an API-key override supplied by the test client.
+    /// The provider type is determined by <paramref name="providerType"/>; model falls back to the
+    /// corresponding entry in <paramref name="baseConfig"/> when the caller omits it.
+    /// </summary>
+    private static IAiProvider CreateOverrideProvider(
+        AiProviderType providerType, string apiKey, string? model,
+        AppConfig baseConfig, IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory)
+    {
+        var httpClient = httpClientFactory.CreateClient();
+        return providerType switch
+        {
+            AiProviderType.ChatGPT => new OpenAIProvider(
+                httpClient,
+                new AppConfig { OpenAI = new OpenAIConfig { ApiKey = apiKey, Model = string.IsNullOrWhiteSpace(model) ? baseConfig.OpenAI.Model : model! }, General = baseConfig.General, Agent = baseConfig.Agent },
+                loggerFactory.CreateLogger<OpenAIProvider>()),
+            AiProviderType.Claude => new AnthropicProvider(
+                httpClient,
+                new AppConfig { Anthropic = new AnthropicConfig { ApiKey = apiKey, Model = string.IsNullOrWhiteSpace(model) ? baseConfig.Anthropic.Model : model! }, General = baseConfig.General, Agent = baseConfig.Agent },
+                loggerFactory.CreateLogger<AnthropicProvider>()),
+            _ => new GeminiProvider(
+                httpClient,
+                new AppConfig { Gemini = new GeminiConfig { ApiKey = apiKey, Model = string.IsNullOrWhiteSpace(model) ? baseConfig.Gemini.Model : model! }, General = baseConfig.General, Agent = baseConfig.Agent },
+                loggerFactory.CreateLogger<GeminiProvider>()),
+        };
     }
 }
 
 // Scoped to this file — it's a transport detail for the test endpoint, not a domain type.
-file record TestChatRequest(string? Prompt, string? ApiKey, string? Model, string? ImageBase64, string? ImageMimeType, string? ConversationId);
-file record TestCoordinatePromptRequest(string? ScreenshotBase64, string? ItemToIdentify, string? ApiKey, string? Model, string? Mode, int OriginX = 0, int OriginY = 0)
+file record TestChatRequest(string? Prompt, string? ApiKey, string? Model, AiProviderType? Provider, string? ImageBase64, string? ImageMimeType, string? ConversationId);
+file record TestCoordinatePromptRequest(string? ScreenshotBase64, string? ItemToIdentify, string? ApiKey, string? Model, AiProviderType? Provider, string? Mode, int OriginX = 0, int OriginY = 0)
 {
     /// <summary>
     /// Constructs a <see cref="Screenshot"/> from <see cref="ScreenshotBase64"/> and the
