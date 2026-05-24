@@ -2,6 +2,8 @@
 using Microsoft.Extensions.FileProviders;
 using Thio_Universal_Agent;
 using Thio_Universal_Agent.AI_API.Gemini;
+using Thio_Universal_Agent.AI_API.OpenAI;
+using Thio_Universal_Agent.AI_API.Anthropic;
 using Thio_Universal_Agent.Endpoints;
 using Thio_Universal_Agent.Handlers;
 using Thio_Universal_Agent.OS_Windows;
@@ -32,7 +34,24 @@ else
 }
 
 builder.Services.AddSingleton<AppConfig>();
-builder.Services.AddHttpClient<IAiProvider, GeminiProvider>();
+
+// Register all API providers
+builder.Services.AddHttpClient<GeminiProvider>();
+builder.Services.AddHttpClient<OpenAIProvider>();
+builder.Services.AddHttpClient<AnthropicProvider>();
+
+// Dynamic factory to resolve the active provider at runtime
+builder.Services.AddTransient<IAiProvider>(sp =>
+{
+    var config = sp.GetRequiredService<AppConfig>();
+    return config.General.ActiveProvider switch
+    {
+        AiProviderType.ChatGPT => sp.GetRequiredService<OpenAIProvider>(),
+        AiProviderType.Claude => sp.GetRequiredService<AnthropicProvider>(),
+        _ => sp.GetRequiredService<GeminiProvider>()
+    };
+});
+
 builder.Services.AddTransient<CoordinatePrompter>();
 builder.Services.AddTransient<AgentActionExecutor>();
 builder.Services.AddTransient<AgentLoop>();

@@ -24,6 +24,7 @@ internal static class ConfigEndpoints
         {
             var response = new AppConfigResponse(
                 General: new GeneralConfigDto(
+                        ActiveProvider:     appConfig.General.ActiveProvider.ToString(),
                         SettleDelayMs:      appConfig.General.SettleDelayMs,
                         QueueSettleDelayMs: appConfig.General.QueueSettleDelayMs,
                         EnableContextReset: appConfig.General.EnableContextReset,
@@ -45,6 +46,16 @@ internal static class ConfigEndpoints
                     ThinkingBudget:            appConfig.Gemini.ThinkingBudget,
                     ThinkingLevel:             appConfig.Gemini.ThinkingLevel?.ToString()
                 ),
+                OpenAI: new OpenAIConfigDto(
+                    Model:           appConfig.OpenAI.Model,
+                    Temperature:     (double?)appConfig.OpenAI.Temperature,
+                    MaxOutputTokens: appConfig.OpenAI.MaxOutputTokens
+                ),
+                Anthropic: new AnthropicConfigDto(
+                    Model:           appConfig.Anthropic.Model,
+                    Temperature:     (double?)appConfig.Anthropic.Temperature,
+                    MaxOutputTokens: appConfig.Anthropic.MaxOutputTokens
+                ),
                 Hotkeys: new HotkeyConfigDto(
                     Enabled:            appConfig.Hotkeys.Enabled,
                     PauseResumeHotkey:  appConfig.Hotkeys.PauseResumeHotkey,
@@ -59,13 +70,14 @@ internal static class ConfigEndpoints
 
         app.MapGet("/api/config/schema", (AppConfig appConfig) =>
         {
-            // Add a line here for each new provider — everything else is auto-reflected
             var sections = new object[]
             {
-                BuildSection("general", "General", appConfig.General, isProvider: false),
-                BuildSection("gemini",  "Gemini",  appConfig.Gemini,  isProvider: true),
-                BuildSection("agent",   "Agent",   appConfig.Agent,   isProvider: false),
-                BuildSection("hotkeys", "Hotkeys", appConfig.Hotkeys, isProvider: false),
+                BuildSection("general",   "General",   appConfig.General,   isProvider: false),
+                BuildSection("gemini",    "Gemini",    appConfig.Gemini,    isProvider: true),
+                BuildSection("openai",    "ChatGPT",    appConfig.OpenAI,    isProvider: true),
+                BuildSection("anthropic", "Claude", appConfig.Anthropic, isProvider: true),
+                BuildSection("agent",     "Agent",     appConfig.Agent,     isProvider: false),
+                BuildSection("hotkeys",   "Hotkeys",   appConfig.Hotkeys,   isProvider: false),
             };
             return Results.Ok(new { sections });
         });
@@ -74,9 +86,11 @@ internal static class ConfigEndpoints
 
         app.MapPost("/api/config", (JsonElement body, AppConfig appConfig, HotkeyService? hotkeyService) =>
         {
-            if (body.TryGetProperty("general", out var generalEl)) { ApplyUpdates(appConfig.General, generalEl); }
-            if (body.TryGetProperty("gemini",  out var geminiEl))  ApplyUpdates(appConfig.Gemini, geminiEl);
-            if (body.TryGetProperty("agent",   out var agentEl))   ApplyUpdates(appConfig.Agent, agentEl);
+            if (body.TryGetProperty("general", out var generalEl)) ApplyUpdates(appConfig.General, generalEl);
+            if (body.TryGetProperty("gemini", out var geminiEl)) ApplyUpdates(appConfig.Gemini, geminiEl);
+            if (body.TryGetProperty("openai", out var openaiEl)) ApplyUpdates(appConfig.OpenAI, openaiEl);
+            if (body.TryGetProperty("anthropic", out var anthropicEl)) ApplyUpdates(appConfig.Anthropic, anthropicEl);
+            if (body.TryGetProperty("agent", out var agentEl)) ApplyUpdates(appConfig.Agent, agentEl);
             if (body.TryGetProperty("hotkeys", out var hotkeysEl))
             {
                 ApplyUpdates(appConfig.Hotkeys, hotkeysEl);
@@ -106,11 +120,11 @@ internal static class ConfigEndpoints
             string fieldType;
             string[]? options = null;
 
-            if (underlying == typeof(string))       fieldType = attr.IsPassword ? "password" : attr.IsPromptTemplate ? "prompt-template" : "string";
-            else if (underlying == typeof(int))     fieldType = "int";
-            else if (underlying == typeof(float))   fieldType = "float";
-            else if (underlying == typeof(double))  fieldType = "float";
-            else if (underlying == typeof(bool))    fieldType = "bool";
+            if (underlying == typeof(string)) fieldType = attr.IsPassword ? "password" : attr.IsPromptTemplate ? "prompt-template" : "string";
+            else if (underlying == typeof(int)) fieldType = "int";
+            else if (underlying == typeof(float)) fieldType = "float";
+            else if (underlying == typeof(double)) fieldType = "float";
+            else if (underlying == typeof(bool)) fieldType = "bool";
             else if (underlying.IsEnum)
             {
                 fieldType = "enum";
@@ -127,9 +141,9 @@ internal static class ConfigEndpoints
 
             fields.Add(new
             {
-                key         = CamelCase.ConvertName(prop.Name),
-                label       = attr.Label,
-                type        = fieldType,
+                key = CamelCase.ConvertName(prop.Name),
+                label = attr.Label,
+                type = fieldType,
                 description = attr.Description,
                 nullable,
                 value,
@@ -167,11 +181,11 @@ internal static class ConfigEndpoints
                 }
 
                 object? converted = null;
-                if      (underlying == typeof(string))  converted = prop.Value.GetString();
-                else if (underlying == typeof(int))     converted = prop.Value.GetInt32();
-                else if (underlying == typeof(float))   converted = (float)prop.Value.GetDouble();
-                else if (underlying == typeof(double))  converted = prop.Value.GetDouble();
-                else if (underlying == typeof(bool))    converted = prop.Value.GetBoolean();
+                if (underlying == typeof(string)) converted = prop.Value.GetString();
+                else if (underlying == typeof(int)) converted = prop.Value.GetInt32();
+                else if (underlying == typeof(float)) converted = (float)prop.Value.GetDouble();
+                else if (underlying == typeof(double)) converted = prop.Value.GetDouble();
+                else if (underlying == typeof(bool)) converted = prop.Value.GetBoolean();
                 else if (underlying.IsEnum && prop.Value.ValueKind == JsonValueKind.String)
                     converted = Enum.Parse(underlying, prop.Value.GetString()!, ignoreCase: true);
 
@@ -189,10 +203,13 @@ internal sealed record AppConfigResponse(
     GeneralConfigDto General,
     AgentConfigDto Agent,
     GeminiConfigDto Gemini,
+    OpenAIConfigDto OpenAI,
+    AnthropicConfigDto Anthropic,
     HotkeyConfigDto Hotkeys
 );
 
 internal sealed record GeneralConfigDto(
+    string ActiveProvider,
     int SettleDelayMs,
     int QueueSettleDelayMs,
     bool EnableContextReset,
@@ -221,4 +238,16 @@ internal sealed record HotkeyConfigDto(
     bool Enabled,
     string PauseResumeHotkey,
     string StopHotkey
+);
+
+internal sealed record OpenAIConfigDto(
+    string? Model,
+    double? Temperature,
+    int? MaxOutputTokens
+);
+
+internal sealed record AnthropicConfigDto(
+    string? Model,
+    double? Temperature,
+    int? MaxOutputTokens
 );

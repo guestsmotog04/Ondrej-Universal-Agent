@@ -30,15 +30,35 @@ internal static class AgentEndpoints
             if (string.IsNullOrWhiteSpace(req.Goal))
                 return Results.BadRequest(new { error = "Goal is required." });
 
-            // Use the per-request key if provided; otherwise fall back to whatever is already in AppConfig.
-            var resolvedKey = string.IsNullOrWhiteSpace(req.ApiKey) ? appConfig.Gemini.ApiKey : req.ApiKey;
+            var activeProvider = appConfig.General.ActiveProvider;
+
+            // Use the per-request key if provided; otherwise fall back to whatever is already in AppConfig for the active provider.
+            var defaultKey = activeProvider switch
+            {
+                AiProviderType.ChatGPT => appConfig.OpenAI.ApiKey,
+                AiProviderType.Claude => appConfig.Anthropic.ApiKey,
+                _ => appConfig.Gemini.ApiKey
+            };
+
+            var resolvedKey = string.IsNullOrWhiteSpace(req.ApiKey) ? defaultKey : req.ApiKey;
             if (string.IsNullOrWhiteSpace(resolvedKey))
                 return Results.BadRequest(new { error = "No API key found. Set one in Configuration or enter it here." });
 
-            appConfig.Gemini.ApiKey = resolvedKey;
-
-            if (!string.IsNullOrWhiteSpace(req.Model))
-                appConfig.Gemini.Model = req.Model;
+            if (activeProvider == AiProviderType.ChatGPT)
+            {
+                appConfig.OpenAI.ApiKey = resolvedKey;
+                if (!string.IsNullOrWhiteSpace(req.Model)) appConfig.OpenAI.Model = req.Model;
+            }
+            else if (activeProvider == AiProviderType.Claude)
+            {
+                appConfig.Anthropic.ApiKey = resolvedKey;
+                if (!string.IsNullOrWhiteSpace(req.Model)) appConfig.Anthropic.Model = req.Model;
+            }
+            else
+            {
+                appConfig.Gemini.ApiKey = resolvedKey;
+                if (!string.IsNullOrWhiteSpace(req.Model)) appConfig.Gemini.Model = req.Model;
+            }
 
             // Set or clear the monitor selection for this session
             appConfig.Agent.MonitorIndex = req.MonitorIndex;

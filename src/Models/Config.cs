@@ -1,4 +1,6 @@
 ﻿using Thio_Universal_Agent.AI_API.Gemini;
+using Thio_Universal_Agent.AI_API.OpenAI;
+using Thio_Universal_Agent.AI_API.Anthropic;
 using Thio_Universal_Agent;
 
 #pragma warning disable IDE0130 // Namespace does not match folder structure
@@ -26,11 +28,21 @@ public sealed class ConfigFieldAttribute(string label) : Attribute
     public bool IsPromptTemplate { get; init; }
 }
 
+public enum AiProviderType
+{
+    Gemini,
+    ChatGPT,
+    Claude
+}
+
 // ── General ───────────────────────────────────────────────────────────────────
 
 /// <summary>Application-level settings that apply globally, regardless of AI provider.</summary>
 public class GeneralConfig
 {
+    [ConfigField("Active AI Provider", Description = "Which AI API provider to use for the agent")]
+    public AiProviderType ActiveProvider { get; set; } = AiProviderType.Gemini;
+
     [ConfigField("Settle Delay (ms)", Description = "Milliseconds to wait after each action before taking the next screenshot")]
     public int SettleDelayMs { get; set; } = 1000;
 
@@ -74,6 +86,8 @@ public class GeneralConfig
     /// <summary>Creates a <see cref="GeneralConfig"/> loaded from a <c>General</c> configuration section.</summary>
     public GeneralConfig(IConfigurationSection section)
     {
+        if (Enum.TryParse<AiProviderType>(section["ActiveProvider"], ignoreCase: true, out var ap)) ActiveProvider = ap;
+
         if (int.TryParse(section["SettleDelayMs"], out var d) && d > 0)
             SettleDelayMs = d;
 
@@ -165,6 +179,8 @@ public class HotkeyConfig
 public class AppConfig
 {
     public GeminiConfig Gemini { get; set; } = new();
+    public OpenAIConfig OpenAI { get; set; } = new();
+    public AnthropicConfig Anthropic { get; set; } = new();
     public AgentConfig Agent { get; set; } = new();
     public GeneralConfig General { get; set; } = new();
     public HotkeyConfig Hotkeys { get; set; } = new();
@@ -177,8 +193,10 @@ public class AppConfig
     /// <summary>Creates an <see cref="AppConfig"/> and loads values from <paramref name="configuration"/>.</summary>
     public AppConfig(IConfiguration configuration)
     {
-        Gemini  = new GeminiConfig(configuration.GetSection("Gemini"));
-        Agent   = new AgentConfig(configuration.GetSection("Agent"));
+        Gemini = new GeminiConfig(configuration.GetSection("Gemini"));
+        OpenAI = new OpenAIConfig(configuration.GetSection("OpenAI"));
+        Anthropic = new AnthropicConfig(configuration.GetSection("Anthropic"));
+        Agent = new AgentConfig(configuration.GetSection("Agent"));
         General = new GeneralConfig(configuration.GetSection("General"));
         Hotkeys = new HotkeyConfig(configuration.GetSection("Hotkeys"));
     }
