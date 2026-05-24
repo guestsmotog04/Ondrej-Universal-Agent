@@ -240,7 +240,7 @@ public sealed partial class CoordinatePrompter
     /// <param name="gridAxisMaxValue">The maximum value for axis labels, or <see langword="null"/> to use the maximum of <paramref name="cols"/> and <paramref name="rows"/></param>
     /// <param name="gridLinesOnly">When <see langword="true"/>, only draw the grid lines without any labels or tick marks. Default is <see langword="false"/>.</param>
     /// <param name="innerLabels">When <see langword="true"/>, axis labels are drawn inside the grid cells instead of outside. Default is <see langword="false"/>.</param>
-    private static void DrawRulerGrid(
+    private static ICanvas DrawRulerGrid(
         ICanvas canvas,
         int rulerOffset,
         int imageWidth,
@@ -331,6 +331,8 @@ public sealed partial class CoordinatePrompter
                 canvas.DrawLine(rulerOffset - tickLen, y, rulerOffset, y);
             }
         }
+
+        return canvas;
     }
 
     /// <summary> / Creates a PNG image of the source image cropped to the specified view region with a grid overlay and axis labels. / </summary>
@@ -345,8 +347,8 @@ public sealed partial class CoordinatePrompter
     /// <param name="noOuterBorder">When <see langword="true"/>, no margin is added around the image for axis labels, and the cropped view is drawn flush to the edges. Default is <see langword="false"/>.</param>
     /// <param name="innerLabels">When <see langword="true"/>, axis labels are drawn inside the grid cells instead of outside. Default is <see langword="false"/>.</param>
     /// <returns>A byte array containing the PNG image data.</returns>
+    /// <summary>Creates a PNG image of the source cropped to <paramref name="view"/> with a grid overlay and axis labels drawn on top.</summary>
     private static byte[] CreateGridOverlayImage(
-    /// <summary> / Creates a PNG image of the source cropped to <paramref name="view"/> with a grid / overlay and axis labels drawn on top. / </summary>
         SkiaImage source,
         ViewRegion view,
         int cols = Screenshot.DefaultDivisions,
@@ -356,7 +358,8 @@ public sealed partial class CoordinatePrompter
         float? lineThickness = null,
         int minResolution = 0,
         bool noOuterBorder = false,
-        bool innerLabels = false
+        bool innerLabels = false,
+        bool addGridOverlay = true
         )
     {
         Color color = gridColor ?? Color.FromRgba(236, 72, 153, 102); // ~40% opacity pink
@@ -381,7 +384,7 @@ public sealed partial class CoordinatePrompter
             canvasHeight = imageHeight;
         }
 
-        using var context = new SkiaBitmapExportContext(canvasWidth, canvasHeight, 1.0f);
+        using SkiaBitmapExportContext context = new SkiaBitmapExportContext(canvasWidth, canvasHeight, 1.0f);
         ICanvas canvas = context.Canvas;
 
         if (!noOuterBorder)
@@ -414,9 +417,13 @@ public sealed partial class CoordinatePrompter
             gridLinesOnly = false;
         }
 
-        DrawRulerGrid(canvas, rulerOffset, imageWidth, imageHeight, cols, rows, color, lineThickness, gridAxisMaxValue, gridLinesOnly, innerLabels);
+        if (addGridOverlay)
+        {
+            // Technically we could mutate canvas even without the return or a ref param, but we will just for clarity
+            canvas = DrawRulerGrid(canvas, rulerOffset, imageWidth, imageHeight, cols, rows, color, lineThickness, gridAxisMaxValue, gridLinesOnly, innerLabels);
+        }
 
-        using var ms = new MemoryStream();
+        using MemoryStream ms = new MemoryStream();
         context.WriteToStream(ms);
         return ms.ToArray();
     }

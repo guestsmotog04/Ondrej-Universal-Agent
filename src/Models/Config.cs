@@ -73,6 +73,9 @@ public class GeneralConfig
     [ConfigField("Double-Click Delay (ms)", Description = "Milliseconds between the two clicks of a double-click action")]
     public int DoubleClickDelayMs { get; set; } = 60;
 
+    [ConfigField("Draw Grid Overlay on Screenshots", Description = "Overlay a grid onto screenshots before sending to the AI. May help with accuracy for some models, others not.")]
+    public bool AddGridOverlay { get; set; } = true;
+
     [ConfigField("System Prompt Template",
         Description = "The full instruction prompt sent to the AI at the start of every session. Use {systemInfo}, {goal}, {maxQueueSize}, and {normalizeSize} as placeholders (including the brackets) — do not rename or remove them.",
         IsPromptTemplate = true)]
@@ -102,6 +105,7 @@ public class GeneralConfig
         if (int.TryParse(section["ContextResetInterval"], out var cri) && cri >= 1) ContextResetInterval = cri;
         if (int.TryParse(section["MaxParseRetries"], out var mpr) && mpr >= 0) MaxParseRetries = mpr;
         if (int.TryParse(section["DoubleClickDelayMs"], out var dcd) && dcd >= 0) DoubleClickDelayMs = dcd;
+        if (bool.TryParse(section["AddGridOverlay"], out var ago)) AddGridOverlay = ago;
         var spt = section["SystemPromptTemplate"];
         if (!string.IsNullOrEmpty(spt)) SystemPromptTemplate = spt;
     }

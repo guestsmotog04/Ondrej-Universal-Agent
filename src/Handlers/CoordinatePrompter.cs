@@ -137,7 +137,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         int imageWidth = (int)source.Width;
         int imageHeight = (int)source.Height;
 
-        byte[] gridImage = CreateGridOverlayImage(source, view, divisions, divisions);
+        byte[] gridImage = CreateGridOverlayImage(source, view, divisions, divisions, addGridOverlay: appConfig.General.AddGridOverlay);
         string prompt = MakeCoordinatePrompt(itemToIdentify);
 
         // Start the conversation with the prompt + initial grid image
@@ -211,7 +211,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         for (int i = 0; i < _maxZoomIterations && ShouldContinueZooming(view, divisions, divisions); i++)
         {
             view = CalculateZoomRegion(view, coordinate, imageWidth, imageHeight, divisions, divisions);
-            byte[] zoomedImage = CreateGridOverlayImage(source, view, minResolution: MinZoomResolution);
+            byte[] zoomedImage = CreateGridOverlayImage(source, view, minResolution: MinZoomResolution, addGridOverlay: appConfig.General.AddGridOverlay);
 
             // Send just the zoomed image; the AI continues from the same conversation
             response = await aiProvider.ContinueConversationAsync(
