@@ -967,7 +967,7 @@
 
     // ── Save ──────────────────────────────────────────────────────────────────
 
-    document.getElementById('btn-save').addEventListener('click', async () => {
+    async function saveSettings() {
         if (Object.keys(pendingChanges).length === 0) {
             showToast('Nothing to save');
             return;
@@ -1052,7 +1052,9 @@
         pendingChanges = {};
         if (!hasLockedSecret) showToast('Saved');
         setStatus('Saved');
-    });
+    }
+
+    document.getElementById('btn-save').addEventListener('click', saveSettings);
 
     async function pushToServer(changes) {
         // POST only the sections that changed
@@ -1163,8 +1165,8 @@
         }
 
         if (count > 0) {
-            setStatus(`Imported ${count} field(s) — click Save to apply`);
-            showToast('Imported');
+            await saveSettings();
+            showToast('Imported & Saved');
         } else {
             setStatus('Nothing to import');
             showToast('Nothing to import');
