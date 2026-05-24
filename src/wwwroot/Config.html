@@ -651,6 +651,12 @@
         remCheck.id      = 'vault-remember';
         remCheck.title   = 'Store the password hash in browser storage so the vault unlocks automatically next time';
         remCheck.checked = !!localStorage.getItem(VAULT_KEY);
+        remCheck.addEventListener('change', () => {
+            // Keep the lock button label in sync when toggled while vault is unlocked.
+            const lockBtn = document.getElementById('btn-vault-lock');
+            if (lockBtn && lockBtn.style.display !== 'none')
+                lockBtn.textContent = remCheck.checked ? 'Lock & Forget' : 'Lock';
+        });
         remLabel.appendChild(remCheck);
         remLabel.appendChild(document.createTextNode(' Remember hash'));
         row.appendChild(remLabel);
@@ -692,14 +698,18 @@
         btnLock.textContent = 'Lock';
         btnLock.style.display = 'none';
         btnLock.addEventListener('click', async () => {
+            const hadRemembered = !!localStorage.getItem(VAULT_KEY);
             vaultPasswordHash  = null;
             vaultSessionActive = false;
+            localStorage.removeItem(VAULT_KEY);
+            const remCb = document.getElementById('vault-remember');
+            if (remCb) remCb.checked = false;
             for (const { sectionKey, fieldKey } of getPasswordFields()) {
                 const input = findInput(sectionKey, fieldKey);
                 if (input) { input.value = ''; input.placeholder = '(encrypted — unlock vault to load)'; }
             }
             setVaultUnlocked(false);
-            showToast('Vault locked');
+            showToast(hadRemembered ? 'Vault locked & hash forgotten' : 'Vault locked');
             try { await fetch('/api/secrets/vault/lock', { method: 'POST' }); } catch { /* best-effort */ }
         });
         row.appendChild(btnLock);
@@ -722,7 +732,10 @@
         section.classList.toggle('session',  on && source === 'session');
         if (badge)  badge.textContent    = on ? (source === 'session' ? 'Session Active' : 'Unlocked') : 'Locked';
         if (unlock) unlock.style.display = on ? 'none' : '';
-        if (lock)   lock.style.display   = on ? ''     : 'none';
+        if (lock) {
+            lock.style.display = on ? '' : 'none';
+            if (on) lock.textContent = localStorage.getItem(VAULT_KEY) ? 'Lock & Forget' : 'Lock';
+        }
         if (input)  input.disabled       = on;
     }
 
