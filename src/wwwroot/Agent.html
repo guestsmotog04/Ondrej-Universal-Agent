@@ -428,27 +428,26 @@
             color: #cc8833;
         }
 
-        .step-parse-rejections {
-            margin-top: 5px;
-            border-left: 2px solid #8a4040;
-            padding-left: 7px;
+        .step-entry.parse-rejected {
+            border-left: 3px solid #7a2020;
+            background: #1a0a0a;
+            opacity: 0.9;
         }
 
-        .step-parse-rejection-label {
-            font-size: 10px;
+        .step-entry.parse-rejected .step-num {
+            color: #884444;
+        }
+
+        .step-entry.parse-rejected .step-action {
             color: #c06060;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            margin-bottom: 2px;
         }
 
-        .step-parse-rejection-item {
-            font-size: 11px;
-            color: #b07070;
-            white-space: pre-wrap;
-            word-break: break-word;
-            margin-bottom: 2px;
+        .step-entry.parse-rejected .step-thought {
+            color: #7a5555;
+        }
+
+        .step-entry.parse-rejected .step-result {
+            color: #c06060;
         }
 
         .step-entry.guidance-entry {
@@ -1315,7 +1314,8 @@
 
         const entry = document.createElement('div');
         const isCancelled = !msg.success && !msg.isTerminal && msg.result === 'Action cancelled by user.';
-        entry.className = 'step-entry' + (isCancelled ? ' cancelled' : '');
+        const isParseRejected = !!msg.isParseRejected;
+        entry.className = 'step-entry' + (isCancelled ? ' cancelled' : '') + (isParseRejected ? ' parse-rejected' : '');
 
         let html = `
             <span class="step-num">#${msg.stepNumber}</span>
@@ -1340,15 +1340,6 @@
         // Nested expandable queue sub-steps
         if (msg.queuedSubSteps && msg.queuedSubSteps.length > 1) {
             html += renderQueuedSubSteps(msg.queuedSubSteps);
-        }
-
-        if (msg.parseRejections && msg.parseRejections.length > 0) {
-            const label = msg.parseRejections.length === 1 ? 'Rejected attempt' : `Rejected attempts (${msg.parseRejections.length})`;
-            html += `<div class="step-parse-rejections">`;
-            html += `<div class="step-parse-rejection-label">⚠ ${escapeHtml(label)}</div>`;
-            for (const r of msg.parseRejections)
-                html += `<div class="step-parse-rejection-item">${escapeHtml(r)}</div>`;
-            html += `</div>`;
         }
 
         if (msg.debugLog && msg.debugLog.length > 0) {
