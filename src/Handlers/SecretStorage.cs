@@ -5,12 +5,21 @@ using System.IO;
 
 namespace Thio_Universal_Agent;
 
+/// <summary>Represents the raw AES-encrypted payload for a single vault entry (IV + ciphertext, both Base64-encoded).</summary>
+public sealed record VaultEntryData(string IV, string Ciphertext);
+
 public interface ISecretProvider
 {
     void SaveSecret(string keyName, string plainTextSecret, string passwordHash);
     string? LoadSecret(string keyName, string passwordHash);
     bool SecretExists(string keyName);
     void DeleteSecret(string keyName);
+
+    /// <summary>Returns the raw encrypted entries for every key present in the vault, without decrypting them.</summary>
+    IReadOnlyDictionary<string, VaultEntryData> ExportAllEncryptedSecrets();
+
+    /// <summary>Writes raw encrypted entries directly into the vault, overwriting any existing entry for the same key. No decryption is performed.</summary>
+    void ImportEncryptedSecrets(IReadOnlyDictionary<string, VaultEntryData> entries);
 }
 
 /// <summary>
@@ -115,6 +124,28 @@ public class SecretsHandler : ISecretProvider
         }
     }
 
+    public IReadOnlyDictionary<string, VaultEntryData> ExportAllEncryptedSecrets()
+    {
+        lock (_fileLock)
+        {
+            Dictionary<string, VaultEntry> vault = ReadVaultFile();
+            return vault.ToDictionary(
+                kvp => kvp.Key,
+                kvp => new VaultEntryData(kvp.Value.IV, kvp.Value.Ciphertext));
+        }
+    }
+
+    public void ImportEncryptedSecrets(IReadOnlyDictionary<string, VaultEntryData> entries)
+    {
+        lock (_fileLock)
+        {
+            Dictionary<string, VaultEntry> vault = ReadVaultFile();
+            foreach (KeyValuePair<string, VaultEntryData> kvp in entries)
+                vault[kvp.Key] = new VaultEntry(kvp.Value.IV, kvp.Value.Ciphertext);
+            WriteVaultFile(vault);
+        }
+    }
+
     private Dictionary<string, VaultEntry> ReadVaultFile()
     {
         if (!File.Exists(_vaultFilePath))
@@ -135,5 +166,5 @@ public class SecretsHandler : ISecretProvider
         return Rfc2898DeriveBytes.Pbkdf2(passwordHashEntropy, AppSalt, 100_000, HashAlgorithmName.SHA256, 32);
     }
 
-    private sealed record VaultEntry(string IV, string Ciphertext);
+    private sealed record VaultEntry(string IV, string Ciphertext);  // internal file format — not exposed via API
 }

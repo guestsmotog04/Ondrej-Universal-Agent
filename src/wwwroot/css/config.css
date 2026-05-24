@@ -56,6 +56,19 @@ header h1 { font-size: 20px; font-weight: 600; color: #fff; }
 
 .action-bar .spacer { flex: 1; }
 
+.export-vault-label {
+    font-size: 12px;
+    color: #888;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.export-vault-label:hover { color: #aaa; }
+.export-vault-label input[type="checkbox"] { cursor: pointer; }
+
 .action-bar .status-badge {
     font-size: 11px;
     color: #555;

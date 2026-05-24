@@ -113,6 +113,25 @@ internal static class SecretsEndpoints
             vaultSession.Clear();
             return Results.Ok();
         });
+
+        // ── Vault export (encrypted entries only) ─────────────────────────────
+
+        app.MapGet("/api/secrets/vault/export-entries", (ISecretProvider secrets) =>
+        {
+            IReadOnlyDictionary<string, VaultEntryData> entries = secrets.ExportAllEncryptedSecrets();
+            return Results.Ok(new { entries });
+        });
+
+        // ── Vault import (encrypted entries only) ─────────────────────────────
+
+        app.MapPost("/api/secrets/vault/import-entries", (ImportEntriesRequest req, ISecretProvider secrets) =>
+        {
+            if (req.Entries is null || req.Entries.Count == 0)
+                return Results.BadRequest("entries is required and must not be empty.");
+
+            secrets.ImportEncryptedSecrets(req.Entries);
+            return Results.Ok();
+        });
     }
 }
 
@@ -120,3 +139,4 @@ internal static class SecretsEndpoints
 
 internal sealed record SaveSecretRequest(string KeyName, string Secret, string? PasswordHash);
 internal sealed record LoadSecretRequest(string KeyName, string? PasswordHash);
+internal sealed record ImportEntriesRequest(IReadOnlyDictionary<string, VaultEntryData>? Entries);

@@ -17,6 +17,9 @@
 <div class="action-bar">
     <button class="btn btn-primary" id="btn-save">Save to browser</button>
     <button class="btn" id="btn-export">Export Settings</button>
+    <label class="export-vault-label" id="export-vault-label" title="Include encrypted API keys in the export. You will need your vault password to decrypt them after importing.">
+        <input type="checkbox" id="chk-export-vault"> Include encrypted keys
+    </label>
     <button class="btn" id="btn-import">Import Settings</button>
     <input type="file" id="file-import" accept=".json" style="display:none">
     <div class="spacer"></div>
@@ -711,7 +714,7 @@
 
     // ── Export ────────────────────────────────────────────────────────────────
 
-    document.getElementById('btn-export').addEventListener('click', () => {
+    document.getElementById('btn-export').addEventListener('click', async () => {
         // Build a clean export from stored browser values
         const exportObj = {};
         for (const section of serverDefaults) {
@@ -721,9 +724,27 @@
                 const value  = stored !== undefined ? stored : field.value;
                 if (field.type !== 'password') {
                     exportObj[section.label][field.label] = value;
-                } else {
-                    exportObj[section.label][field.label] = stored ? '(set)' : '(not set)';
                 }
+                // Password fields are never written to the export as plaintext
+            }
+        }
+
+        // Optionally embed raw encrypted vault entries
+        if (document.getElementById('chk-export-vault')?.checked) {
+            try {
+                const res = await fetch('/api/secrets/vault/export-entries');
+                if (res.ok) {
+                    const { entries } = await res.json();
+                    if (entries && Object.keys(entries).length > 0) {
+                        exportObj['_vault'] = entries;
+                    } else {
+                        showToast('No encrypted keys found in vault', true);
+                    }
+                } else {
+                    showToast('Could not read vault entries', true);
+                }
+            } catch {
+                showToast('Error reading vault entries', true);
             }
         }
 
@@ -755,6 +776,27 @@
             return;
         }
 
+        // Import encrypted vault entries if present — written straight to the vault (still encrypted)
+        let vaultImported = false;
+        if (importedObj['_vault'] && typeof importedObj['_vault'] === 'object') {
+            const entries = importedObj['_vault'];
+            try {
+                const res = await fetch('/api/secrets/vault/import-entries', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ entries }),
+                });
+                if (res.ok) {
+                    vaultImported = true;
+                    await updatePasswordPlaceholders();
+                } else {
+                    showToast('Failed to import encrypted keys', true);
+                }
+            } catch {
+                showToast('Error importing encrypted keys', true);
+            }
+        }
+
         // Build label → key lookup maps from serverDefaults
         const sectionByLabel = {};
         for (const section of serverDefaults) {
@@ -763,6 +805,7 @@
 
         let count = 0;
         for (const [sectionLabel, fields] of Object.entries(importedObj)) {
+            if (sectionLabel === '_vault') continue; // already handled above
             const section = sectionByLabel[sectionLabel];
             if (!section) continue;
 
@@ -774,7 +817,7 @@
             for (const [fieldLabel, value] of Object.entries(fields)) {
                 const field = fieldByLabel[fieldLabel];
                 if (!field) continue;
-                // Skip password placeholder strings — the real value can't be reconstructed
+                // Password fields are handled via _vault — skip any placeholder strings
                 if (field.type === 'password') continue;
                 if (value === null || value === undefined) continue;
 
@@ -796,7 +839,10 @@
 
         if (count > 0) {
             await saveSettings();
-            showToast('Imported & Saved');
+            if (vaultImported) showToast('Imported — unlock vault to use API keys');
+            else               showToast('Imported & Saved');
+        } else if (vaultImported) {
+            showToast('Encrypted keys imported — unlock vault to use them');
         } else {
             setStatus('Nothing to import');
             showToast('Nothing to import');
