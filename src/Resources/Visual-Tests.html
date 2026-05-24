@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Vision Click Accuracy Test</title>
+    <style>
+        :root {
+            /* Dark Theme Variables */
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-main: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --accent: #4caf50;
+            --accent-hover: #45a049;
+            --error: #f44336;
+            --border: #333333;
+            --canvas-bg: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar & Controls */
+        #sidebar {
+            width: 320px;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 20px;
+            overflow-y: auto;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            color: #fff;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        /* Stats Table */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            background: var(--bg-color);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        /* Buttons */
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button.secondary {
+            background-color: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+        }
+
+        button.secondary:hover {
+            background-color: var(--border);
+        }
+
+        /* Hide the main start/restart button from AI Agent vision unless hovered */
+        #btn-start {
+            opacity: 0;
+            transition: opacity 0.2s, background-color 0.2s;
+        }
+
+        #btn-start:hover {
+            opacity: 1;
+        }
+
+        /* Drop Zone */
+        #import-zone {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            background-color: var(--bg-color);
+            font-size: 0.9rem;
+        }
+
+        #import-zone:hover, #import-zone.dragover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background-color: rgba(76, 175, 80, 0.05);
+        }
+
+        /* Main Test Area */
+        #main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab {
+            padding: 15px 25px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            color: var(--text-muted);
+            user-select: none;
+        }
+
+        .tab.active {
+            color: white;
+            border-bottom-color: var(--accent);
+            background-color: var(--bg-color);
+        }
+
+        /* Canvas / Test Zone */
+        #test-canvas {
+            flex-grow: 1;
+            background-color: var(--canvas-bg);
+            position: relative;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Visual Targets */
+        .target-circle {
+            position: absolute;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-family: sans-serif;
+            cursor: crosshair;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            /* High contrast text outline so numbers are always readable regardless of random color */
+            color: #000;
+            text-shadow: 
+                -1px -1px 0 #fff,  
+                 1px -1px 0 #fff,
+                -1px  1px 0 #fff,
+                 1px  1px 0 #fff;
+            transform: translate(-50%, -50%); /* Centers the coordinate precisely */
+        }
+
+        /* Feedback overlays */
+        .flash-error {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(244, 67, 54, 0.3);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 1000;
+        }
+        
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            margin-top: 10px;
+        }
+        
+        .history-table th, .history-table td {
+            text-align: left;
+            padding: 5px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Color Grid Test Styles */
+        .grid-square {
+            position: absolute;
+            cursor: pointer;
+            box-sizing: border-box;
+            border: 1px solid rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+        }
+        
+        .grid-square:active {
+            transform: scale(0.95);
+        }
+
+        .red-x {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--error);
+            font-weight: bold;
+            pointer-events: none;
+            line-height: 1;
+            font-family: sans-serif;
+        }
+
+        #color-target-container {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            background: var(--bg-color);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        #target-color-box {
+            width: 100%;
+            height: 60px;
+            border-radius: 6px;
+            border: 2px solid var(--border);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h1>AI Vision Click Test</h1>
+        
+        <div id="color-target-container">
+            <div class="section-title">Target Color</div>
+            <div id="target-color-box"></div>
+        </div>
+
+        <div>
+            <div class="section-title">Current Test Stats</div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-label">Target</span>
+                    <span class="stat-value" id="stat-target">- / -</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Errors</span>
+                    <span class="stat-value" id="stat-errors" style="color: var(--error)">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Time (s)</span>
+                    <span class="stat-value" id="stat-time">0.0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Accuracy</span>
+                    <span class="stat-value" id="stat-accuracy">100%</span>
+                </div>
+            </div>
+        </div>
+
+        <button id="btn-start" onclick="app.startTest()">Start Test Run</button>
+
+        <div style="flex-grow: 1;">
+            <div class="section-title">Score History</div>
+            <div style="max-height: 150px; overflow-y: auto;">
+                <table class="history-table" id="history-table">
+                    <thead>
+                        <tr>
+                            <th>Run</th>
+                            <th>Time</th>
+                            <th>Errs</th>
+                            <th>Acc</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div>
+            <div class="section-title">Data Management</div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button class="secondary" onclick="app.exportData()">Export Scores (Save As)</button>
+                <div id="import-zone">
+                    Click or Drag & Drop<br>Settings JSON to Import
+                </div>
+                <input type="file" id="file-input" accept=".json" style="display: none;">
+            </div>
+        </div>
+    </div>
+
+    <div id="main-content">
+        <div class="tabs">
+            <div class="tab active" data-tab="sequential">Sequential Numbers Test</div>
+            <div class="tab" data-tab="colorGrid">Color Grid Test</div>
+        </div>
+        
+        <div id="test-canvas">
+            <div id="error-flash" class="flash-error"></div>
+            <!-- Circles injected here by JS -->
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Optional CORS Proxy for fetching external assets if added in future.
+         * Usage: fetch(CORS_PROXY + "https://example.com/api");
+         * @constant {string}
+         */
+        const CORS_PROXY = "https://localhost:5001/?url=";
+
+        /**
+         * Centralized default settings for the tool.
+         * Modifying these values changes the core behavior of the test.
+         * @constant {Object}
+         */
+        const DEFAULT_SETTINGS = {
+            targetCount: 20,          // Number of circles to generate
+            minRadius: 5,             // Minimum circle size in pixels
+            maxRadius: 20,            // Maximum circle size in pixels
+            preventOverlap: true,     // Attempt to prevent circles from overlapping
+            maxPlacementAttempts: 500,// Max loops to find non-overlapping coordinates
+            minFontSize: 14,          // Minimum font size; if smaller, text goes outside the circle
+            gridSquareSize: 60,       // Size of squares in Color Grid Test
+            gridTargetCount: 15,      // Number of correct color squares to spawn
+            minColorDifference: 50    // Minimum color difference (scale 0-100) between target and grid bg squares
+        };
+
+        /**
+         * @typedef {Object} Target
+         * @property {number} id - The sequential ID of the target.
+         * @property {number} x - X coordinate (center).
+         * @property {number} y - Y coordinate (center).
+         * @property {number} r - Radius.
+         * @property {string} color - CSS color string.
+         * @property {HTMLElement} [element] - Reference to the DOM node.
+         */
+
+        /**
+         * @typedef {Object} ScoreRecord
+         * @property {number} runId - Sequential run number
+         * @property {number} targets - Number of targets
+         * @property {number} errors - Number of mistakes
+         * @property {number} timeSeconds - Time taken in seconds
+         * @property {number} accuracy - Percentage accuracy
+         */
+
+        class ClickTestApp {
+            constructor() {
+                /** @type {Object} Current active settings */
+                this.settings = { ...DEFAULT_SETTINGS };
+                
+                /** @type {string} Current active test type */
+                this.currentTestType = 'sequential'; // 'sequential' | 'colorGrid'
+                
+                /** @type {Target[]} Array of current targets */
+                this.targets = [];
+                
+                /** @type {ScoreRecord[]} History of past runs */
+                this.history = [];
+                
+                // Sequential Test State
+                /** @type {number} The current number the AI must click */
+                this.expectedTarget = 1;
+                
+                // Color Grid Test State
+                /** @type {Object|null} Target HSL color object */
+                this.targetColorObj = null;
+                /** @type {string} Target HSL color string */
+                this.targetColor = '';
+                /** @type {number} Remaining targets to click */
+                this.remainingTargets = 0;
+                /** @type {number} Total targets spawned */
+                this.totalGridTargets = 0;
+                
+                /** @type {number} Number of wrong clicks in current run */
+                this.currentErrors = 0;
+                
+                /** @type {number} Timestamp when test started */
+                this.startTime = 0;
+                
+                /** @type {number} Interval ID for the timer */
+                this.timerInterval = null;
+                
+                /** @type {boolean} Is the test currently active? */
+                this.isRunning = false;
+
+                // DOM Elements
+                this.dom = {
+                    canvas: document.getElementById('test-canvas'),
+                    flash: document.getElementById('error-flash'),
+                    statTarget: document.getElementById('stat-target'),
+                    statErrors: document.getElementById('stat-errors'),
+                    statTime: document.getElementById('stat-time'),
+                    statAccuracy: document.getElementById('stat-accuracy'),
+                    historyTable: document.getElementById('history-table').querySelector('tbody'),
+                    importZone: document.getElementById('import-zone'),
+                    fileInput: document.getElementById('file-input'),
+                    btnStart: document.getElementById('btn-start'),
+                    tabs: document.querySelectorAll('.tab'),
+                    colorTargetContainer: document.getElementById('color-target-container'),
+                    targetColorBox: document.getElementById('target-color-box')
+                };
+
+                this.initEventListeners();
+            }
+
+            /**
+             * Binds all static UI event listeners.
+             */
+            initEventListeners() {
+                // Tab Switching
+                this.dom.tabs.forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        if (this.isRunning) return; // Prevent switching while test is active
+                        
+                        this.dom.tabs.forEach(t => t.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.currentTestType = e.target.dataset.tab;
+                        this.dom.btnStart.textContent = "Start Test Run";
+                        this.resetState();
+                        this.updateUI();
+                    });
+                });
+
+                // Canvas Click Handling
+                this.dom.canvas.addEventListener('mousedown', (e) => this.handleCanvasClick(e));
+
+                // Import File Handling (Drag & Drop)
+                this.dom.importZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    this.dom.importZone.classList.add('dragover');
+                });
+                
+                this.dom.importZone.addEventListener('dragleave', () => {
+                    this.dom.importZone.classList.remove('dragover');
+                });
+                
+                this.dom.importZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    this.dom.importZone.classList.remove('dragover');
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                        this.handleImportFile(e.dataTransfer.files[0]);
+                    }
+                });
+
+                // Import File Handling (Click)
+                this.dom.importZone.addEventListener('click', () => {
+                    this.dom.fileInput.click();
+                });
+                
+                this.dom.fileInput.addEventListener('change', (e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                        this.handleImportFile(e.target.files[0]);
+                        // Reset input so same file can be loaded again if needed
+                        e.target.value = '';
+                    }
+                });
+            }
+
+            /**
+             * Generates a random HSL color object.
+             * @returns {{h: number, s: number, l: number}}
+             */
+            getRandomColorObject() {
+                const hue = Math.floor(Math.random() * 360);
+                const saturation = 60 + Math.floor(Math.random() * 40); // 60-100%
+                const lightness = 40 + Math.floor(Math.random() * 30);  // 40-70%
+                return { h: hue, s: saturation, l: lightness };
+            }
+
+            /**
+             * Converts an HSL color object to a CSS string.
+             * @param {{h: number, s: number, l: number}} hsl
+             * @returns {string}
+             */
+            hslToCss(hsl) {
+                return `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
+            }
+
+            /**
+             * Calculates the color difference score between two HSL colors on a scale of 0 to 100.
+             * Hue holds a 70% weight as it defines fundamental color categories.
+             * @param {{h: number, s: number, l: number}} c1
+             * @param {{h: number, s: number, l: number}} c2
+             * @returns {number}
+             */
+            getColorDifference(c1, c2) {
+                let dh = Math.abs(c1.h - c2.h);
+                if (dh > 180) dh = 360 - dh;
+                const dhNorm = (dh / 180) * 100; // 0 to 100
+
+                const ds = Math.abs(c1.s - c2.s); // 0 to 100
+                const dl = Math.abs(c1.l - c2.l); // 0 to 100
+
+                // Weighted Euclidean distance
+                return Math.sqrt(0.7 * dhNorm * dhNorm + 0.15 * ds * ds + 0.15 * dl * dl);
+            }
+
+            /**
+             * Generates a random HSL color string for good contrast against white backgrounds.
+             * @returns {string} CSS hsl color string.
+             */
+            getRandomColor() {
+                return this.hslToCss(this.getRandomColorObject());
+            }
+
+            /**
+             * Starts a new test run. Generates targets and starts the timer.
+             */
+            startTest() {
+                this.resetState();
+                this.isRunning = true;
+                this.dom.btnStart.textContent = "Restart Test";
+                
+                const width = this.dom.canvas.clientWidth;
+                const height = this.dom.canvas.clientHeight;
+
+                if (this.currentTestType === 'sequential') {
+                    this.targets = this.generateTargets(this.settings.targetCount, width, height);
+                    this.renderTargets();
+                } else if (this.currentTestType === 'colorGrid') {
+                    this.generateAndRenderColorGrid(width, height);
+                }
+                
+                this.startTime = performance.now();
+                this.timerInterval = setInterval(() => this.updateUI(), 100);
+                this.updateUI();
+            }
+
+            /**
+             * Ends the current test run and saves the score.
+             */
+            endTest() {
+                this.isRunning = false;
+                clearInterval(this.timerInterval);
+                
+                const timeTaken = (performance.now() - this.startTime) / 1000;
+                let totalClicks = 0;
+                let correctClicks = 0;
+
+                if (this.currentTestType === 'sequential') {
+                    totalClicks = this.settings.targetCount + this.currentErrors;
+                    correctClicks = this.settings.targetCount;
+                } else {
+                    totalClicks = this.totalGridTargets + this.currentErrors;
+                    correctClicks = this.totalGridTargets;
+                }
+                
+                const accuracy = totalClicks > 0 ? (correctClicks / totalClicks) * 100 : 0;
+
+                const record = {
+                    runId: this.history.length + 1,
+                    targets: correctClicks,
+                    errors: this.currentErrors,
+                    timeSeconds: parseFloat(timeTaken.toFixed(2)),
+                    accuracy: parseFloat(accuracy.toFixed(1))
+                };
+
+                this.history.push(record);
+                this.updateHistoryTable();
+                this.updateUI();
+                
+                this.dom.btnStart.textContent = "Start Next Run";
+            }
+
+            /**
+             * Resets test variables and clears the canvas.
+             */
+            resetState() {
+                clearInterval(this.timerInterval);
+                this.expectedTarget = 1;
+                this.remainingTargets = 0;
+                this.currentErrors = 0;
+                this.isRunning = false;
+                
+                if (this.currentTestType === 'colorGrid') {
+                    this.dom.colorTargetContainer.style.display = 'flex';
+                } else {
+                    this.dom.colorTargetContainer.style.display = 'none';
+                }
+                
+                // Remove all current targets from DOM
+                const existingTargets = this.dom.canvas.querySelectorAll('.target-circle, .grid-square');
+                existingTargets.forEach(el => el.remove());
+            }
+
+            /**
+             * Generates target data with optional overlap prevention.
+             * @param {number} count - Number of targets to create.
+             * @param {number} areaWidth - Width of the canvas.
+             * @param {number} areaHeight - Height of the canvas.
+             * @returns {Target[]} Array of target configurations.
+             */
+            generateTargets(count, areaWidth, areaHeight) {
+                const targets = [];
+                
+                for (let i = 1; i <= count; i++) {
+                    let placed = false;
+                    let attempts = 0;
+                    
+                    while (!placed && attempts < this.settings.maxPlacementAttempts) {
+                        const r = this.settings.minRadius + Math.random() * (this.settings.maxRadius - this.settings.minRadius);
+                        
+                        // Ensure circle center keeps the whole circle inside the boundaries
+                        const x = r + Math.random() * (areaWidth - r * 2);
+                        const y = r + Math.random() * (areaHeight - r * 2);
+                        
+                        let overlap = false;
+                        if (this.settings.preventOverlap) {
+                            for (const existing of targets) {
+                                const dist = Math.hypot(existing.x - x, existing.y - y);
+                                // Add 2px padding between circles
+                                if (dist < (r + existing.r + 2)) {
+                                    overlap = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!overlap || attempts === this.settings.maxPlacementAttempts - 1) {
+                            targets.push({ id: i, x, y, r, color: this.getRandomColor() });
+                            placed = true;
+                        }
+                        attempts++;
+                    }
+                }
+                
+                return targets;
+            }
+
+            /**
+             * Renders the target data array into actual DOM elements.
+             */
+            renderTargets() {
+                this.targets.forEach(target => {
+                    const el = document.createElement('div');
+                    el.className = 'target-circle';
+                    el.style.backgroundColor = target.color;
+                    el.style.width = `${target.r * 2}px`;
+                    el.style.height = `${target.r * 2}px`;
+                    el.style.left = `${target.x}px`;
+                    el.style.top = `${target.y}px`;
+                    
+                    const label = document.createElement('span');
+                    label.textContent = target.id;
+                    
+                    let calcFontSize = target.r * 0.8;
+                    if (calcFontSize < this.settings.minFontSize) {
+                        label.style.fontSize = `${this.settings.minFontSize}px`;
+                        label.style.position = 'absolute';
+                        label.style.left = 'calc(100% + 4px)'; // Place just outside the circle to the right
+                        label.style.top = '50%';
+                        label.style.transform = 'translateY(-50%)';
+                    } else {
+                        label.style.fontSize = `${calcFontSize}px`;
+                    }
+                    
+                    el.appendChild(label);
+                    
+                    // Attach target ID to dataset for easy retrieval on click
+                    el.dataset.id = target.id;
+                    
+                    this.dom.canvas.appendChild(el);
+                    target.element = el;
+                });
+            }
+
+            /**
+             * Generates and renders the Color Grid Test squares.
+             * @param {number} width - Canvas width.
+             * @param {number} height - Canvas height.
+             */
+            generateAndRenderColorGrid(width, height) {
+                const size = this.settings.gridSquareSize;
+                const cols = Math.floor(width / size);
+                const rows = Math.floor(height / size);
+                const totalCells = cols * rows;
+                
+                this.totalGridTargets = Math.min(this.settings.gridTargetCount, totalCells);
+                this.remainingTargets = this.totalGridTargets;
+                
+                this.targetColorObj = this.getRandomColorObject();
+                this.targetColor = this.hslToCss(this.targetColorObj);
+                
+                this.dom.targetColorBox.style.backgroundColor = this.targetColor;
+
+                const cellColors = Array(this.totalGridTargets).fill(this.targetColor);
+                for (let i = 0; i < totalCells - this.totalGridTargets; i++) {
+                    let bgHsl;
+                    let attempts = 0;
+                    
+                    // Procedurally filter colors until they differ enough from the target color
+                    do {
+                        bgHsl = this.getRandomColorObject();
+                        attempts++;
+                    } while (
+                        this.getColorDifference(this.targetColorObj, bgHsl) < this.settings.minColorDifference && 
+                        attempts < 100
+                    );
+                    
+                    cellColors.push(this.hslToCss(bgHsl));
+                }
+
+                // Fisher-Yates shuffle
+                for (let i = cellColors.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [cellColors[i], cellColors[j]] = [cellColors[j], cellColors[i]];
+                }
+
+                const offsetX = (width - (cols * size)) / 2;
+                const offsetY = (height - (rows * size)) / 2;
+
+                let colorIndex = 0;
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < cols; col++) {
+                        const el = document.createElement('div');
+                        el.className = 'grid-square';
+                        el.style.width = `${size}px`;
+                        el.style.height = `${size}px`;
+                        el.style.left = `${offsetX + col * size}px`;
+                        el.style.top = `${offsetY + row * size}px`;
+                        
+                        const color = cellColors[colorIndex++];
+                        el.style.backgroundColor = color;
+                        el.dataset.color = color;
+
+                        this.dom.canvas.appendChild(el);
+                    }
+                }
+            }
+
+            /**
+             * Handles clicks on the canvas area.
+             * @param {MouseEvent} e - The mouse event.
+             */
+            handleCanvasClick(e) {
+                if (!this.isRunning) return;
+
+                if (this.currentTestType === 'sequential') {
+                    const targetEl = e.target.closest('.target-circle');
+                    
+                    if (targetEl) {
+                        const clickedId = parseInt(targetEl.dataset.id, 10);
+                        
+                        if (clickedId === this.expectedTarget) {
+                            // Correct Target Clicked
+                            targetEl.remove();
+                            this.expectedTarget++;
+                            
+                            if (this.expectedTarget > this.settings.targetCount) {
+                                this.endTest();
+                            }
+                        } else {
+                            // Wrong Target Clicked
+                            this.registerError();
+                        }
+                    } else {
+                        // Clicked Background
+                        this.registerError();
+                    }
+                } else if (this.currentTestType === 'colorGrid') {
+                    const squareEl = e.target.closest('.grid-square');
+                    
+                    if (squareEl && squareEl.dataset.clicked !== "true") {
+                        if (squareEl.dataset.color === this.targetColor) {
+                            // Correct color clicked
+                            squareEl.dataset.clicked = "true";
+                            squareEl.style.backgroundColor = '#ffffff'; // Turn pure white to merge into canvas background
+                            squareEl.style.borderColor = 'transparent'; // Remove borders so it invisible
+                            squareEl.style.pointerEvents = 'none'; // Prevent further clicks
+                            
+                            // Remove any wrong X markers if the agent corrected its target (though usually shouldn't happen)
+                            const previousX = squareEl.querySelector('.red-x');
+                            if (previousX) previousX.remove();
+
+                            this.remainingTargets--;
+                            
+                            if (this.remainingTargets <= 0) {
+                                this.endTest();
+                            }
+                        } else {
+                            // Wrong color - register error and draw a red X
+                            this.registerError();
+                            this.drawRedX(squareEl);
+                        }
+                    } else if (!squareEl) {
+                        // Clicked outside any square
+                        this.registerError();
+                    }
+                }
+                
+                this.updateUI();
+            }
+
+            /**
+             * Draws a persistent red X over an incorrect grid square.
+             * @param {HTMLElement} squareEl - The element representing the clicked grid square.
+             */
+            drawRedX(squareEl) {
+                if (squareEl.querySelector('.red-x')) return; // Already marked with X
+                
+                const xEl = document.createElement('div');
+                xEl.className = 'red-x';
+                
+                // Scale X size proportionally with the grid size settings
+                const size = parseFloat(squareEl.style.width) || 40;
+                xEl.style.fontSize = `${size * 0.75}px`;
+                xEl.innerHTML = '&#10006;'; // Unicode math '✖' heavy multiplication sign
+                
+                squareEl.appendChild(xEl);
+            }
+
+            /**
+             * Registers a mistake, increments error count, and flashes the screen.
+             */
+            registerError() {
+                this.currentErrors++;
+                
+                // Trigger flash animation
+                this.dom.flash.style.opacity = '1';
+                setTimeout(() => {
+                    this.dom.flash.style.opacity = '0';
+                }, 150);
+            }
+
+            /**
+             * Updates the sidebar statistic UI values.
+             */
+            updateUI() {
+                if (this.currentTestType === 'sequential') {
+                    const current = Math.min(this.expectedTarget, this.settings.targetCount);
+                    this.dom.statTarget.textContent = this.isRunning ? `${current} / ${this.settings.targetCount}` : "- / -";
+                } else {
+                    const found = this.totalGridTargets - this.remainingTargets;
+                    this.dom.statTarget.textContent = this.isRunning ? `${found} / ${this.totalGridTargets}` : "- / -";
+                }
+                
+                this.dom.statErrors.textContent = this.currentErrors;
+                
+                if (this.isRunning) {
+                    const timeNow = (performance.now() - this.startTime) / 1000;
+                    this.dom.statTime.textContent = timeNow.toFixed(1);
+                    
+                    let totalAttempts = 0;
+                    if (this.currentTestType === 'sequential') {
+                        totalAttempts = (this.expectedTarget - 1) + this.currentErrors;
+                    } else {
+                        totalAttempts = (this.totalGridTargets - this.remainingTargets) + this.currentErrors;
+                    }
+                    
+                    const correctAttempts = totalAttempts - this.currentErrors;
+                    const acc = totalAttempts > 0 ? (correctAttempts / totalAttempts) * 100 : 100;
+                    this.dom.statAccuracy.textContent = `${acc.toFixed(1)}%`;
+                }
+            }
+
+            /**
+             * Populates the history table in the sidebar.
+             */
+            updateHistoryTable() {
+                this.dom.historyTable.innerHTML = '';
+                // Show most recent runs at the top
+                const reversedHistory = [...this.history].reverse();
+                
+                reversedHistory.forEach(rec => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>#${rec.runId}</td>
+                        <td>${rec.timeSeconds}s</td>
+                        <td>${rec.errors}</td>
+                        <td>${rec.accuracy}%</td>
+                    `;
+                    this.dom.historyTable.appendChild(tr);
+                });
+            }
+
+            /**
+             * Handles reading and parsing an imported settings JSON file.
+             * @param {File} file - The file object from drop or input.
+             */
+            handleImportFile(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const importedSettings = JSON.parse(e.target.result);
+                        // Merge imported settings with existing default keys to ensure structure
+                        this.settings = { ...this.settings, ...importedSettings };
+                        alert("Settings imported successfully. Next run will use new parameters.");
+                    } catch (error) {
+                        alert("Failed to parse settings JSON. Please ensure valid format.");
+                        console.error("Import error:", error);
+                    }
+                };
+                reader.readAsText(file);
+            }
+
+            /**
+             * Exports the score history to a JSON file, prompting a 'Save As' dialog.
+             * Uses File System Access API if available, gracefully falls back to object URL.
+             */
+            async exportData() {
+                if (this.history.length === 0) {
+                    alert("No data to export yet. Run a test first.");
+                    return;
+                }
+
+                const dataString = JSON.stringify({
+                    exportedAt: new Date().toISOString(),
+                    settingsUsed: this.settings,
+                    history: this.history
+                }, null, 2);
+
+                const defaultFilename = `ai-vision-scores-${Date.now()}.json`;
+
+                try {
+                    // Try the modern File System Access API first
+                    if (window.showSaveFilePicker) {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: defaultFilename,
+                            types: [{
+                                description: 'JSON Files',
+                                accept: { 'application/json': ['.json'] }
+                            }]
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(dataString);
+                        await writable.close();
+                    } else {
+                        // Fallback method for browsers that don't support showSaveFilePicker
+                        const blob = new Blob([dataString], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = defaultFilename;
+                        document.body.appendChild(a); // Required for Firefox
+                        a.click();
+                        
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }
+                } catch (err) {
+                    // Usually triggered if the user aborts the save dialog
+                    console.info("Export aborted or failed:", err);
+                }
+            }
+        }
+
+        // Initialize the app when DOM is fully parsed
+        let app;
+        document.addEventListener('DOMContentLoaded', () => {
+            app = new ClickTestApp();
+        });
+
+    </script>
+</body>
+</html>
