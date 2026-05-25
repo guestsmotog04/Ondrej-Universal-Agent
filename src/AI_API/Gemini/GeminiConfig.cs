@@ -12,7 +12,7 @@ public class GeminiConfig : IAiProviderConfig
     public string? ApiKey { get; set; }
 
     /// <inheritdoc/>
-    [ConfigField("Model", Description = "Gemini model identifier, e.g. gemini-2.0-flash")]
+    [ConfigField("Model", Description = "Gemini model identifier, e.g. gemini-flash-latest")]
     public string Model { get; set; } = "gemini-flash-latest";
 
     [ConfigField("Media Resolution", Description = "Resolution hint when sending images to the model")]

@@ -108,7 +108,7 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
     public Task<AiResponse> SendPromptWithImageAsync(
         string prompt, 
         byte[] imageBytes, 
-        string mimeType = "image/jpeg", 
+        string mimeType = "image/png", 
         CancellationToken cancellationToken = default, 
         AiRequestOptions? options = null
         )
@@ -190,7 +190,7 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
     public Task<AiResponse> ContinueConversationAsync(
         AiConversation conversation, 
         byte[] imageBytes, 
-        string mimeType = "image/jpeg",
+        string mimeType = "image/png",
         CancellationToken cancellationToken = default, 
         AiRequestOptions? options = null
         )
@@ -212,7 +212,7 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
         AiConversation conversation, 
         string prompt, 
         byte[] imageBytes, 
-        string mimeType = "image/jpeg",
+        string mimeType = "image/png",
         CancellationToken cancellationToken = default, 
         AiRequestOptions? options = null
         )
@@ -372,7 +372,7 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
             parts.Add(new GeminiPart(
                 Text: null, 
                 InlineData: new GeminiInlineData(
-                    MimeType: message.MimeType ?? "image/jpeg", 
+                    MimeType: message.MimeType ?? "image/png", 
                     Data: Convert.ToBase64String(message.ImageBytes)
                 )
             ));

@@ -28,7 +28,7 @@ public sealed class AiChatMessage
     /// <summary>Optional image payload attached to the message.</summary>
     public byte[]? ImageBytes { get; init; }
 
-    /// <summary>MIME type for <see cref="ImageBytes"/> (e.g. "image/jpeg").</summary>
+    /// <summary>MIME type for <see cref="ImageBytes"/> (e.g. "image/png").</summary>
     public string? MimeType { get; init; }
 }
 

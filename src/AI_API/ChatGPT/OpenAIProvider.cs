@@ -47,7 +47,7 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
         return SendRequestAsync(request, cancellationToken);
     }
 
-    public Task<AiResponse> SendPromptWithImageAsync(string prompt, byte[] imageBytes, string mimeType = "image/jpeg", CancellationToken cancellationToken = default, AiRequestOptions? options = null)
+    public Task<AiResponse> SendPromptWithImageAsync(string prompt, byte[] imageBytes, string mimeType = "image/png", CancellationToken cancellationToken = default, AiRequestOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
         ArgumentNullException.ThrowIfNull(imageBytes);
@@ -115,7 +115,7 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
         );
     }
 
-    public Task<AiResponse> ContinueConversationAsync(AiConversation conversation, byte[] imageBytes, string mimeType = "image/jpeg", CancellationToken cancellationToken = default, AiRequestOptions? options = null)
+    public Task<AiResponse> ContinueConversationAsync(AiConversation conversation, byte[] imageBytes, string mimeType = "image/png", CancellationToken cancellationToken = default, AiRequestOptions? options = null)
     {
         AiChatMessage userMessage = new AiChatMessage { Role = AiChatRole.User, ImageBytes = imageBytes, MimeType = mimeType };
 
@@ -127,7 +127,7 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
         );
     }
 
-    public Task<AiResponse> ContinueConversationAsync(AiConversation conversation, string prompt, byte[] imageBytes, string mimeType = "image/jpeg", CancellationToken cancellationToken = default, AiRequestOptions? options = null)
+    public Task<AiResponse> ContinueConversationAsync(AiConversation conversation, string prompt, byte[] imageBytes, string mimeType = "image/png", CancellationToken cancellationToken = default, AiRequestOptions? options = null)
     {
         AiChatMessage userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt, ImageBytes = imageBytes, MimeType = mimeType };
 
@@ -223,7 +223,7 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
             content.Add(new OpenAIContentPart(
                 Type: "image_url",
                 Text: null,
-                ImageUrl: new OpenAIImageUrl($"data:{message.MimeType ?? "image/jpeg"};base64,{Convert.ToBase64String(message.ImageBytes)}")
+                ImageUrl: new OpenAIImageUrl($"data:{message.MimeType ?? "image/png"};base64,{Convert.ToBase64String(message.ImageBytes)}")
             )); 
         }
 

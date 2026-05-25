@@ -47,7 +47,13 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         return SendRequestAsync(request, cancellationToken);
     }
 
-    public Task<AiResponse> SendPromptWithImageAsync(string prompt, byte[] imageBytes, string mimeType = "image/jpeg", CancellationToken cancellationToken = default, AiRequestOptions? options = null)
+    public Task<AiResponse> SendPromptWithImageAsync(
+        string prompt, 
+        byte[] imageBytes, 
+        string mimeType = "image/png",
+        CancellationToken cancellationToken = default, 
+        AiRequestOptions? options = null
+        )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
         ArgumentNullException.ThrowIfNull(imageBytes);
@@ -82,7 +88,11 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         return SendRequestAsync(request, cancellationToken);
     }
 
-    public async Task<(AiConversation Conversation, AiResponse Response)> StartConversationAsync(string prompt, CancellationToken cancellationToken = default, AiRequestOptions? options = null)
+    public async Task<(AiConversation Conversation, AiResponse Response)> StartConversationAsync(
+        string prompt, 
+        CancellationToken cancellationToken = default, 
+        AiRequestOptions? options = null
+        )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
@@ -106,7 +116,12 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         return (conversation, response);
     }
 
-    public Task<AiResponse> ContinueConversationAsync(AiConversation conversation, string prompt, CancellationToken cancellationToken = default, AiRequestOptions? options = null)
+    public Task<AiResponse> ContinueConversationAsync
+        (AiConversation conversation, 
+        string prompt, 
+        CancellationToken cancellationToken = default, 
+        AiRequestOptions? options = null
+        )
     {
         var userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt };
         return ContinueConversationCoreAsync(
@@ -117,7 +132,13 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         );
     }
 
-    public Task<AiResponse> ContinueConversationAsync(AiConversation conversation, byte[] imageBytes, string mimeType = "image/jpeg", CancellationToken cancellationToken = default, AiRequestOptions? options = null)
+    public Task<AiResponse> ContinueConversationAsync(
+        AiConversation conversation, 
+        byte[] imageBytes, 
+        string mimeType = "image/png", 
+        CancellationToken cancellationToken = default, 
+        AiRequestOptions? options = null
+        )
     {
         var userMessage = new AiChatMessage { Role = AiChatRole.User, ImageBytes = imageBytes, MimeType = mimeType };
         return ContinueConversationCoreAsync(
@@ -128,7 +149,14 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         );
     }
 
-    public Task<AiResponse> ContinueConversationAsync(AiConversation conversation, string prompt, byte[] imageBytes, string mimeType = "image/jpeg", CancellationToken cancellationToken = default, AiRequestOptions? options = null)
+    public Task<AiResponse> ContinueConversationAsync(
+        AiConversation conversation, 
+        string prompt, 
+        byte[] imageBytes, 
+        string mimeType = "image/png", 
+        CancellationToken cancellationToken = default, 
+        AiRequestOptions? options = null
+        )
     {
         var userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt, ImageBytes = imageBytes, MimeType = mimeType };
         return ContinueConversationCoreAsync(
@@ -139,7 +167,12 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         );
     }
 
-    private async Task<AiResponse> ContinueConversationCoreAsync(AiConversation conversation, AiChatMessage userMessage, CancellationToken cancellationToken, AiRequestOptions? options)
+    private async Task<AiResponse> ContinueConversationCoreAsync(
+        AiConversation conversation, 
+        AiChatMessage userMessage, 
+        CancellationToken cancellationToken, 
+        AiRequestOptions? options
+        )
     {
         AnthropicRequest request = BuildRequest(
             conversation: conversation, 
@@ -233,7 +266,7 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
                 Text: null,
                 Source: new AnthropicImageSource(
                     Type: "base64",
-                    MediaType: message.MimeType ?? "image/jpeg",
+                    MediaType: message.MimeType ?? "image/png",
                     Data: Convert.ToBase64String(message.ImageBytes)
                 )
             ));

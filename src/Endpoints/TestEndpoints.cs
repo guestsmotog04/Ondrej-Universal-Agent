@@ -31,7 +31,7 @@ internal static class TestEndpoints
             try
             {
                 byte[] imageBytes = screenProvider.CaptureScreen().Original;
-                return Results.File(imageBytes, "image/jpeg");
+                return Results.File(imageBytes, "image/png");
             }
             catch (Exception ex)
             {
@@ -69,8 +69,9 @@ internal static class TestEndpoints
                         if (!hasPrompt)
                             return Results.Problem("Please include text with your first image message.");
 
-                        var result = await provider.SendPromptWithImageAsync(
-                            req.Prompt!, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/jpeg", ct);
+                        AiResponse result = await provider.SendPromptWithImageAsync(
+                            req.Prompt!, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/png", ct);
+
                         return result.Success
                             ? Results.Ok(new { result.Text, conversationId = (string?)null })
                             : Results.Problem(result.ErrorMessage);
@@ -79,14 +80,16 @@ internal static class TestEndpoints
                     if (!hasPrompt)
                         return Results.Problem("Prompt is required to start a conversation.");
 
-                    var (conversation, response) = await provider.StartConversationAsync(req.Prompt!, ct);
+                    (AiConversation? conversation, AiResponse? response) = await provider.StartConversationAsync(req.Prompt!, ct);
                     if (!response.Success)
                         return Results.Problem(response.ErrorMessage);
 
-                    var newId = Guid.NewGuid().ToString("N");
+                    string newId = Guid.NewGuid().ToString("N");
+
                     _conversations[newId] = isKeyOverride
                         ? new TestConversationSession { Conversation = conversation, OverrideApiKey = req.ApiKey, OverrideProviderType = resolvedProviderType, OverrideModel = req.Model }
                         : new TestConversationSession { Conversation = conversation };
+
                     return Results.Ok(new { response.Text, conversationId = newId });
                 }
                 else
@@ -110,10 +113,12 @@ internal static class TestEndpoints
                     AiResponse response;
                     if (hasImage && hasPrompt)
                         response = await provider.ContinueConversationAsync(
-                            session.Conversation, req.Prompt!, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/jpeg", ct);
+                            session.Conversation, req.Prompt!, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/png", ct
+                        );
                     else if (hasImage)
                         response = await provider.ContinueConversationAsync(
-                            session.Conversation, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/jpeg", ct);
+                            session.Conversation, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/png", ct
+                        );
                     else
                         response = await provider.ContinueConversationAsync(session.Conversation, req.Prompt!, ct);
 

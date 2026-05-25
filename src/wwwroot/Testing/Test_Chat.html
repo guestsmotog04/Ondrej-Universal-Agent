@@ -166,7 +166,7 @@
                     const dataUrl = e.target.result;
                     attachedImage = {
                         base64:   dataUrl.split(',')[1],
-                        mimeType: file.type || 'image/jpeg',
+                        mimeType: file.type || 'image/png',
                         dataUrl
                     };
                     imgThumbnail.src = dataUrl;

@@ -16,7 +16,7 @@ public sealed partial class AgentLoop(
     AppConfig appConfig,
     ILogger<AgentLoop> logger)
 {
-    private const string ScreenMimeType = "image/jpeg";
+    private const string ScreenMimeType = "image/png";
 
     private readonly int _maxSteps = appConfig.General.MaxSteps;
     private readonly int _maxParseRetries = appConfig.General.MaxParseRetries;
