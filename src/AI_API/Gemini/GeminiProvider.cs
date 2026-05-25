@@ -27,6 +27,9 @@ public enum GeminiThinkingLevel
 public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, ILogger<GeminiProvider> logger) : IAiProvider
 {
     private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
+    private readonly string? _apiKey = appConfig.Gemini.ApiKey;
+    private readonly string _model = appConfig.Gemini.Model;
+    private readonly GeminiGenerationConfig? _generationConfig = BuildGenerationConfig(appConfig.Gemini);
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -34,12 +37,6 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
         PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
-    // Not validated here — the key may be absent at construction time and supplied later
-    // via the web UI (AppConfig.Gemini.ApiKey is set by the /api/agent/start endpoint).
-    // Validation is deferred to SendRequestAsync so that constructing this type never throws.
-    private readonly string? _apiKey = appConfig.Gemini.ApiKey;
-    private readonly string _model = appConfig.Gemini.Model;
-    private readonly GeminiGenerationConfig? _generationConfig = BuildGenerationConfig(appConfig.Gemini);
 
     private static GeminiGenerationConfig? BuildGenerationConfig(GeminiConfig gemini)
     {

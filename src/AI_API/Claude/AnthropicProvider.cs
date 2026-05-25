@@ -12,7 +12,9 @@ namespace Thio_Universal_Agent.AI_API.Anthropic;
 /// </summary>
 public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig, ILogger<AnthropicProvider> logger) : IAiProvider
 {
-    private const string BaseUrl = "https://api.anthropic.com/v1/messages";
+    private const string BaseUrl = "https://api.anthropic.com/v1/messages"; //See: https://platform.claude.com/docs/en/api/messages
+    private readonly string? _apiKey = appConfig.Anthropic.ApiKey;
+    private readonly string _model = appConfig.Anthropic.Model;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -20,9 +22,6 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
-
-    private readonly string? _apiKey = appConfig.Anthropic.ApiKey;
-    private readonly string _model = appConfig.Anthropic.Model;
 
     public Task<AiResponse> SendPromptAsync(string prompt, CancellationToken cancellationToken = default, AiRequestOptions? options = null)
     {
@@ -123,7 +122,8 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         AiRequestOptions? options = null
         )
     {
-        var userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt };
+        AiChatMessage userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt };
+
         return ContinueConversationCoreAsync(
             conversation: conversation,
             userMessage: userMessage,
@@ -140,7 +140,7 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         AiRequestOptions? options = null
         )
     {
-        var userMessage = new AiChatMessage { Role = AiChatRole.User, ImageBytes = imageBytes, MimeType = mimeType };
+        AiChatMessage userMessage = new AiChatMessage { Role = AiChatRole.User, ImageBytes = imageBytes, MimeType = mimeType };
         return ContinueConversationCoreAsync(
             conversation: conversation,
             userMessage: userMessage,
@@ -158,7 +158,7 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         AiRequestOptions? options = null
         )
     {
-        var userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt, ImageBytes = imageBytes, MimeType = mimeType };
+        AiChatMessage userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt, ImageBytes = imageBytes, MimeType = mimeType };
         return ContinueConversationCoreAsync(
             conversation: conversation,
             userMessage: userMessage,
@@ -194,11 +194,16 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
     private async Task<AiResponse> SendRequestAsync(AnthropicRequest request, CancellationToken cancellationToken)
     {
         string? apiKey = _apiKey ?? appConfig.Anthropic.ApiKey;
+
         if (string.IsNullOrWhiteSpace(apiKey))
+        {
             throw new InvalidOperationException("Anthropic:ApiKey is not configured. Provide an API key via the web UI.");
+        }
 
         if (logger.IsEnabled(LogLevel.Debug))
+        {
             logger.LogDebug("Sending prompt to Anthropic model {Model}.", _model);
+        }
 
         using HttpRequestMessage httpRequest = new HttpRequestMessage(HttpMethod.Post, BaseUrl);
         httpRequest.Headers.Add("x-api-key", apiKey);
@@ -219,6 +224,7 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         }
 
         AnthropicResponse? anthropicResponse = await response.Content.ReadFromJsonAsync<AnthropicResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+
         string? text = anthropicResponse?.Content?.FirstOrDefault(c => c.Type == "text")?.Text;
 
         if (string.IsNullOrWhiteSpace(text))
@@ -242,8 +248,9 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         List<AnthropicMessage> messages = new List<AnthropicMessage>(conversation.Messages.Count + 1);
 
         foreach (AiChatMessage message in conversation.Messages)
+        {
             messages.Add(ToAnthropicMessage(message: message, stripImages: stripHistoryImages));
-
+        }
         messages.Add(ToAnthropicMessage(message: additionalMessage, stripImages: false));
 
         return new AnthropicRequest(
@@ -273,7 +280,9 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         }
 
         if (message.Text is not null)
+        {
             content.Add(new AnthropicContentPart(Type: "text", Text: message.Text, Source: null));
+        }
 
         return new AnthropicMessage(Role: role, Content: content);
     }

@@ -12,6 +12,8 @@ namespace Thio_Universal_Agent.AI_API.OpenAI;
 public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, ILogger<OpenAIProvider> logger) : IAiProvider
 {
     private const string BaseUrl = "https://api.openai.com/v1/chat/completions";
+    private readonly string? _apiKey = appConfig.OpenAI.ApiKey;
+    private readonly string _model = appConfig.OpenAI.Model;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -19,9 +21,6 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
         PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
-
-    private readonly string? _apiKey = appConfig.OpenAI.ApiKey;
-    private readonly string _model = appConfig.OpenAI.Model;
 
     public Task<AiResponse> SendPromptAsync(string prompt, CancellationToken cancellationToken = default, AiRequestOptions? options = null)
     {

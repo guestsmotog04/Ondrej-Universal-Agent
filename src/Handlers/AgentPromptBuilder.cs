@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace Thio_Universal_Agent.Handlers;
 
 /// <summary>
@@ -262,11 +264,15 @@ public static class AgentPromptBuilder
         if (messages.Count == 1)
             return $"[USER GUIDANCE] The user has sent you the following mid-session instruction — treat it as a high-priority directive that may override or adjust your current plan:\n\"{messages[0]}\"\n\n";
 
-        var sb = new System.Text.StringBuilder();
+        StringBuilder sb = new System.Text.StringBuilder();
         sb.AppendLine("[USER GUIDANCE] The user has sent the following mid-session instructions — treat them as high-priority directives that may override or adjust your current plan:");
+
         for (int i = 0; i < messages.Count; i++)
+        {
             sb.AppendLine($"{i + 1}. \"{messages[i]}\"");
+        }
         sb.AppendLine();
+
         return sb.ToString();
     }
 
