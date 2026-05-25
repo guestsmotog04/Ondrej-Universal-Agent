@@ -47,11 +47,11 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
-        var conversation = new AiConversation();
-        var userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt };
+        AiConversation conversation = new AiConversation();
+        AiChatMessage userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt };
 
-        var request = BuildRequest(conversation, userMessage, options);
-        var response = await SendRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        OpenAIRequest request = BuildRequest(conversation, userMessage, options);
+        AiResponse response = await SendRequestAsync(request, cancellationToken).ConfigureAwait(false);
 
         if (response.Success)
         {
@@ -64,26 +64,26 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
 
     public Task<AiResponse> ContinueConversationAsync(AiConversation conversation, string prompt, CancellationToken cancellationToken = default, AiRequestOptions? options = null)
     {
-        var userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt };
+        AiChatMessage userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt };
         return ContinueConversationCoreAsync(conversation, userMessage, cancellationToken, options);
     }
 
     public Task<AiResponse> ContinueConversationAsync(AiConversation conversation, byte[] imageBytes, string mimeType = "image/jpeg", CancellationToken cancellationToken = default, AiRequestOptions? options = null)
     {
-        var userMessage = new AiChatMessage { Role = AiChatRole.User, ImageBytes = imageBytes, MimeType = mimeType };
+        AiChatMessage userMessage = new AiChatMessage { Role = AiChatRole.User, ImageBytes = imageBytes, MimeType = mimeType };
         return ContinueConversationCoreAsync(conversation, userMessage, cancellationToken, options);
     }
 
     public Task<AiResponse> ContinueConversationAsync(AiConversation conversation, string prompt, byte[] imageBytes, string mimeType = "image/jpeg", CancellationToken cancellationToken = default, AiRequestOptions? options = null)
     {
-        var userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt, ImageBytes = imageBytes, MimeType = mimeType };
+        AiChatMessage userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt, ImageBytes = imageBytes, MimeType = mimeType };
         return ContinueConversationCoreAsync(conversation, userMessage, cancellationToken, options);
     }
 
     private async Task<AiResponse> ContinueConversationCoreAsync(AiConversation conversation, AiChatMessage userMessage, CancellationToken cancellationToken, AiRequestOptions? options)
     {
         var request = BuildRequest(conversation, userMessage, options);
-        var response = await SendRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        AiResponse response = await SendRequestAsync(request, cancellationToken).ConfigureAwait(false);
 
         if (response.Success)
         {
@@ -103,15 +103,15 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("Sending prompt to OpenAI model {Model}.", _model);
 
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, BaseUrl);
+        using HttpRequestMessage httpRequest = new HttpRequestMessage(HttpMethod.Post, BaseUrl);
         httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         httpRequest.Content = JsonContent.Create(request, options: JsonOptions);
 
-        using var response = await httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
+        using HttpResponseMessage response = await httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
         {
-            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            string errorBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             logger.LogError("OpenAI API returned {StatusCode}. Body: {ErrorBody}", (int)response.StatusCode, errorBody);
             return new AiResponse(false, string.Empty, $"HTTP {(int)response.StatusCode}: {errorBody}");
         }
@@ -130,7 +130,7 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
         bool stripHistoryImages = appConfig.General.StripHistoryImages;
         var messages = new List<OpenAIMessage>(conversation.Messages.Count + 1);
 
-        foreach (var message in conversation.Messages)
+        foreach (AiChatMessage message in conversation.Messages)
             messages.Add(ToOpenAIMessage(message, stripImages: stripHistoryImages));
 
         messages.Add(ToOpenAIMessage(additionalMessage, stripImages: false));

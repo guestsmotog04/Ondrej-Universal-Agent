@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Reflection;
+using System.Text.Json.Serialization;
 using Thio_Universal_Agent.AI_API.Gemini;
 using Thio_Universal_Agent.AI_API.OpenAI;
 using Thio_Universal_Agent.AI_API.Anthropic;
@@ -69,6 +70,7 @@ internal static class ConfigSectionBinder
     }
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum AiProviderType
 {
     Gemini,

@@ -92,18 +92,38 @@
             try { return JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}'); } catch { return {}; }
         }
 
+        // Maps AiProviderType enum name to its localStorage section key and display name.
+        const PROVIDER_SECTION_MAP = { 'Gemini': 'gemini', 'ChatGPT': 'openai', 'Claude': 'anthropic' };
+
+        /**
+         * Returns the active provider name (e.g. 'Gemini'), its localStorage section key,
+         * and the apiKey/model values from stored config.
+         */
+        function getActiveProviderConfig() {
+            const cfg = getStoredConfig();
+            const providerName = cfg?.general?.activeProvider ?? null;
+            const sectionKey  = providerName ? (PROVIDER_SECTION_MAP[providerName] ?? null) : null;
+            return {
+                providerName,
+                apiKey: sectionKey ? (cfg?.[sectionKey]?.apiKey || null) : null,
+                model:  sectionKey ? (cfg?.[sectionKey]?.model  || null) : null,
+            };
+        }
+
         // Show current model in header badge
         (async () => {
             try {
-                const cfg = getStoredConfig();
-                const storedModel = cfg?.gemini?.model;
-                if (storedModel) {
-                    document.getElementById('model-badge').textContent = storedModel;
+                const { providerName, model: storedModel } = getActiveProviderConfig();
+                if (providerName && storedModel) {
+                    document.getElementById('model-badge').textContent = `${providerName}: ${storedModel}`;
                 } else {
                     const r = await fetch('/api/config');
                     if (r.ok) {
                         const d = await r.json();
-                        if (d.gemini?.model) document.getElementById('model-badge').textContent = d.gemini.model;
+                        const provider = d.general?.activeProvider ?? null;
+                        const sectionKey = provider ? (PROVIDER_SECTION_MAP[provider] ?? null) : null;
+                        const model = sectionKey ? d[sectionKey]?.model : null;
+                        if (provider && model) document.getElementById('model-badge').textContent = `${provider}: ${model}`;
                     }
                 }
             } catch {}
@@ -259,9 +279,10 @@
                         originX: 0,
                         originY: 0,
                         itemToIdentify: itemInput.value.trim(),
-                        apiKey: getStoredConfig()?.gemini?.apiKey || null,
-                        model:  getStoredConfig()?.gemini?.model  || null,
-                        mode:   coordinateModeSelect.value || null
+                        provider: getActiveProviderConfig().providerName,
+                        apiKey:   getActiveProviderConfig().apiKey,
+                        model:    getActiveProviderConfig().model,
+                        mode:     coordinateModeSelect.value || null
                     })
                 });
 

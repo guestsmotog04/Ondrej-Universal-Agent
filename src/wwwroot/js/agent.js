@@ -11,7 +11,7 @@
 /** @typedef {{ type: 'guidanceQueued', message: string, cancelNextAction: boolean }} AgentGuidanceQueuedMessage */
 /** @typedef {{ type: 'done', status: string, finalResult?: string, totalDurationMs?: number }} AgentDoneMessage */
 /** @typedef {AgentStepMessage | AgentStepStartingMessage | AgentSubStepMessage | AgentCountdownMessage | AgentGuidanceQueuedMessage | AgentDoneMessage | { type: 'paused' } | { type: 'resumed' }} AgentSseMessage */
-/** @typedef {{ general?: { activeProvider?: string }, gemini?: { model?: string, apiKey?: string }, openai?: { model?: string, apiKey?: string }, anthropic?: { model?: string, apiKey?: string }, [key: string]: (Record<string, unknown> | undefined) }} StoredConfigData */
+/** @typedef {{ gemini?: { model?: string, apiKey?: string }, [key: string]: (Record<string, unknown> | undefined) }} StoredConfigData */
 /** @typedef {{ index: number, isPrimary: boolean, width: number, height: number }} MonitorInfo */
 /** @typedef {{ goal?: string, status: string, isPaused: boolean, startedAt?: string, totalDurationMs?: number, finalResult?: string }} SessionStatusResponse */
 /** @typedef {{ sessionId: string }} StartAgentResponse */
@@ -97,13 +97,14 @@ let elapsedIntervalId;
 
         if (cfgRes.ok) {
             const cfg = await cfgRes.json();
-            const stored = getStoredConfig();
-            const activeProvider = stored?.general?.activeProvider || cfg.general?.activeProvider || 'Gemini';
-            const providerKeyMap = /** @type {Record<string, string>} */({ 'Gemini': 'gemini', 'ChatGPT': 'openai', 'Claude': 'anthropic' });
-            const providerKey = providerKeyMap[activeProvider] ?? activeProvider.toLowerCase();
-            const storedModel = stored?.[providerKey]?.model;
-            const model = storedModel || cfg[providerKey]?.model || '';
-            modelBadge.textContent = model ? `${activeProvider}: ${model}` : activeProvider;
+            const storedCfg = getStoredConfig();
+            const activeProv = storedCfg?.general?.activeProvider || cfg.general?.activeProvider || 'Gemini';
+            let model = null;
+            if (activeProv === 'ChatGPT') model = storedCfg?.openai?.model || cfg.openAI?.model || cfg.openai?.model;
+            else if (activeProv === 'Claude') model = storedCfg?.anthropic?.model || cfg.anthropic?.model;
+            else model = storedCfg?.gemini?.model || cfg.gemini?.model;
+
+            if (model) modelBadge.textContent = model;
         }
 
         if (dbgRes.ok) {
@@ -199,19 +200,63 @@ guidanceInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendGuid
 document.getElementById('btn-skip-countdown')?.addEventListener('click', skipCountdown);
 
 /** @returns {Promise<void>} */
+async function ensureVaultUnlocked() {
+    try {
+        const statusRes = await fetch('/api/secrets/vault/status');
+        if (statusRes.ok) {
+            const { unlocked } = await statusRes.json();
+            if (unlocked) return; // Already unlocked server-side
+        }
+        const hash = localStorage.getItem('tua_vault_hash_v1');
+        if (!hash) return; // Cannot auto-unlock
+
+        const cfg = getStoredConfig();
+        const activeProv = cfg?.general?.activeProvider || 'Gemini';
+        let sectionKey = 'gemini';
+        if (activeProv === 'ChatGPT') sectionKey = 'openai';
+        else if (activeProv === 'Claude') sectionKey = 'anthropic';
+
+        const res = await fetch('/api/secrets/load', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyName: `${sectionKey}_apiKey`, passwordHash: hash })
+        });
+
+        if (res.ok) {
+            const { secret } = await res.json();
+            await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [sectionKey]: { apiKey: secret } })
+            });
+        }
+    } catch { /* best effort */ }
+}
+
+/** @returns {Promise<void>} */
 async function startAgent() {
     const goal = goalInput.value.trim();
     if (!goal) return;
 
+    await ensureVaultUnlocked();
     await pushConfigToServer();
 
     const cfg = getStoredConfig();
     const activeProvider = cfg?.general?.activeProvider || 'Gemini';
-    const providerKeyMap = /** @type {Record<string, string>} */({ 'Gemini': 'gemini', 'ChatGPT': 'openai', 'Claude': 'anthropic' });
-    const providerKey = providerKeyMap[activeProvider] ?? activeProvider.toLowerCase();
-    const providerCfg = /** @type {{ model?: string, apiKey?: string } | undefined} */ (cfg?.[providerKey]);
-    const apiKey = providerCfg?.apiKey || null;
-    const model  = providerCfg?.model  || null;
+
+    let apiKey = null;
+    let model = null;
+
+    if (activeProvider === 'ChatGPT') {
+        apiKey = cfg?.openai?.apiKey || null;
+        model  = cfg?.openai?.model || null;
+    } else if (activeProvider === 'Claude') {
+        apiKey = cfg?.anthropic?.apiKey || null;
+        model  = cfg?.anthropic?.model || null;
+    } else {
+        apiKey = cfg?.gemini?.apiKey || null;
+        model  = cfg?.gemini?.model || null;
+    }
 
     // Clear any previous session from storage so a fresh session takes over
     localStorage.removeItem(SESSION_STORE_KEY);
