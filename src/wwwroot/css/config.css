@@ -101,7 +101,26 @@ main {
     display: flex;
     flex-direction: column;
     gap: 28px;
-    max-width: 900px;
+    max-width: 1200px;
+}
+
+.config-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    align-items: start;
+}
+
+.config-column {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+@media (max-width: 900px) {
+    .config-columns {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ── section ── */
@@ -141,10 +160,31 @@ main {
 }
 
 .fields-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 1px;
     background: #242424;
+}
+
+details.config-section summary {
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+details.config-section summary::-webkit-details-marker {
+    display: none;
+}
+
+.collapse-icon {
+    margin-left: auto;
+    font-size: 10px;
+    color: #888;
+    transition: transform 0.2s;
+}
+
+details[open].config-section .collapse-icon {
+    transform: rotate(180deg);
 }
 
 /* ── individual field ── */
@@ -155,8 +195,6 @@ main {
     flex-direction: column;
     gap: 5px;
 }
-
-.field-row.full-width { grid-column: 1 / -1; }
 
 .field-label {
     font-size: 11px;

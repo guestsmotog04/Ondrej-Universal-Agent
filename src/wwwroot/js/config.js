@@ -168,7 +168,7 @@ async function checkAndApplyServerVaultSession() {
 }
 
 /**
- * Renders the vault section and inserts it at the top of #config-main.
+ * Renders the vault section and inserts it into the left column.
  * @returns {void}
  */
 function renderVaultSection() {
@@ -292,9 +292,9 @@ function renderVaultSection() {
     body.appendChild(row);
     wrap.appendChild(body);
 
-    const main = document.getElementById('config-main');
-    if (!main) return;
-    main.insertBefore(wrap, main.firstChild);
+    const colLeft = document.getElementById('col-left');
+    if (!colLeft) return;
+    colLeft.insertBefore(wrap, colLeft.firstChild);
 }
 
 /**
@@ -372,34 +372,78 @@ async function init() {
  * @returns {void}
  */
 function renderSections(sections) {
-    const main = document.getElementById('config-main');
-    if (!main) return;
-    main.innerHTML = '';
+    const colLeft = document.getElementById('col-left');
+    const colRight = document.getElementById('col-right');
+    const colBottom = document.getElementById('col-bottom');
+    if (!colLeft || !colRight || !colBottom) return;
+
+    colLeft.innerHTML = '';
+    colRight.innerHTML = '';
+    colBottom.innerHTML = '';
 
     for (const section of sections) {
-        const wrap = document.createElement('div');
+        let fieldsToRender = section.fields;
+        let systemPromptField = null;
+
+        // Extract the System Prompt from General so we can isolate it into the full-width column
+        if (section.key === 'general') {
+            systemPromptField = section.fields.find(f => f.key === 'systemPromptTemplate');
+            fieldsToRender = section.fields.filter(f => f.key !== 'systemPromptTemplate');
+        }
+
+        // Use native collapsible <details> tag for providers
+        const wrap = document.createElement(section.isProvider ? 'details' : 'div');
         wrap.className = 'config-section';
+        // Note: The 'open' attribute is purposefully omitted here so provider sections start collapsed.
         wrap.dataset.section = section.key;
 
         // Header
-        const hdr = document.createElement('div');
+        const hdr = document.createElement(section.isProvider ? 'summary' : 'div');
         hdr.className = 'section-header';
         hdr.innerHTML = `<span class="section-title">${escHtml(section.label)}</span>`;
-        if (section.isProvider)
+        if (section.isProvider) {
             hdr.innerHTML += `<span class="provider-badge">AI Provider</span>`;
+            hdr.innerHTML += `<span class="collapse-icon">▼</span>`;
+        }
         wrap.appendChild(hdr);
 
         // Fields grid
         const grid = document.createElement('div');
         grid.className = 'fields-grid';
 
-        for (const field of section.fields) {
+        for (const field of fieldsToRender) {
             const row = buildFieldRow(section.key, field);
             grid.appendChild(row);
         }
 
         wrap.appendChild(grid);
-        main.appendChild(wrap);
+        
+        // Push to appropriate column
+        if (section.isProvider) {
+            colRight.appendChild(wrap);
+        } else {
+            colLeft.appendChild(wrap);
+        }
+
+        // Render system prompt in its own full width wrapper at the bottom
+        if (systemPromptField) {
+            const spWrap = document.createElement('div');
+            spWrap.className = 'config-section';
+            spWrap.dataset.section = section.key;
+
+            const spHdr = document.createElement('div');
+            spHdr.className = 'section-header';
+            spHdr.innerHTML = `<span class="section-title">System Prompt</span>`;
+            spWrap.appendChild(spHdr);
+
+            const spGrid = document.createElement('div');
+            spGrid.className = 'fields-grid';
+            const spRow = buildFieldRow(section.key, systemPromptField);
+            spGrid.appendChild(spRow);
+            spWrap.appendChild(spGrid);
+
+            colBottom.appendChild(spWrap);
+        }
     }
 }
 
