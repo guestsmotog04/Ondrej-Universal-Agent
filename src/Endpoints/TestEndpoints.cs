@@ -19,7 +19,7 @@ internal static class TestEndpoints
 
     internal static void MapTestEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/api/test");
+        RouteGroupBuilder group = app.MapGroup("/api/test");
 
         // Thin HTTP shells for the browser-based test UI.
         // Production agent code calls these C# classes directly — never through these endpoints.
@@ -94,7 +94,7 @@ internal static class TestEndpoints
                 }
                 else
                 {
-                    if (!_conversations.TryGetValue(req.ConversationId!, out var session))
+                    if (!_conversations.TryGetValue(req.ConversationId!, out TestConversationSession? session))
                         return Results.Problem("Conversation not found or expired. Please clear and start a new conversation.");
                     if (session.Conversation == null)
                         return Results.Problem("Invalid conversation state. Please clear and start a new conversation.");
@@ -112,15 +112,21 @@ internal static class TestEndpoints
 
                     AiResponse response;
                     if (hasImage && hasPrompt)
+                    {
                         response = await provider.ContinueConversationAsync(
                             session.Conversation, req.Prompt!, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/png", ct
                         );
+                    }
                     else if (hasImage)
+                    {
                         response = await provider.ContinueConversationAsync(
                             session.Conversation, Convert.FromBase64String(req.ImageBase64!), req.ImageMimeType ?? "image/png", ct
                         );
+                    }
                     else
+                    {
                         response = await provider.ContinueConversationAsync(session.Conversation, req.Prompt!, ct);
+                    }
 
                     return response.Success
                         ? Results.Ok(new { response.Text, conversationId = req.ConversationId })
@@ -182,8 +188,8 @@ internal static class TestEndpoints
                 CoordinatePrompter prompter;
                 if (!string.IsNullOrWhiteSpace(req.ApiKey))
                 {
-                    var providerType = req.Provider ?? appConfig.General.ActiveProvider;
-                    var overrideConfig = new AppConfig { General = appConfig.General, Agent = appConfig.Agent };
+                    AiProviderType providerType = req.Provider ?? appConfig.General.ActiveProvider;
+                    AppConfig overrideConfig = new AppConfig { General = appConfig.General, Agent = appConfig.Agent };
                     IAiProvider provider = CreateOverrideProvider(providerType, req.ApiKey!, req.Model, appConfig, httpClientFactory, loggerFactory);
                     prompter = new CoordinatePrompter(provider, appConfig);
                 }
@@ -193,11 +199,11 @@ internal static class TestEndpoints
                 }
 
                 Screenshot screenshot = req.Screenshot!; // Origin (0, 0) — client has no virtual-desktop context
-                CoordinateMode? coordinateMode = Enum.TryParse<CoordinateMode>(req.Mode, ignoreCase: true, out var parsedMode)
+                CoordinateMode? coordinateMode = Enum.TryParse<CoordinateMode>(req.Mode, ignoreCase: true, out CoordinateMode parsedMode)
                     ? parsedMode
                     : null;
 
-                var steps = new List<object>();
+                List<object> steps = new List<object>();
 
                 ScreenCoordinate result = await prompter.GetCoordinatesForItemAsync(
                     screenshot,
@@ -249,7 +255,7 @@ internal static class TestEndpoints
         AiProviderType providerType, string apiKey, string? model,
         AppConfig baseConfig, IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory)
     {
-        var httpClient = httpClientFactory.CreateClient();
+        HttpClient httpClient = httpClientFactory.CreateClient();
         return providerType switch
         {
             AiProviderType.ChatGPT => new OpenAIProvider(

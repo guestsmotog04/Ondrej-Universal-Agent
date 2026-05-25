@@ -173,7 +173,7 @@ public static class AgentPromptBuilder
         if (SystemProvider is null)
             return string.Empty;
 
-        var sb = new System.Text.StringBuilder();
+        StringBuilder sb = new System.Text.StringBuilder();
         sb.AppendLine($"OS: {SystemProvider.GetOSName()} — {SystemProvider.GetOSDescription()}");
         sb.AppendLine($"Architecture: {SystemProvider.GetArchitecture()}");
         sb.AppendLine($"Current Culture: {System.Globalization.CultureInfo.CurrentCulture.DisplayName}");
@@ -229,7 +229,7 @@ public static class AgentPromptBuilder
         if (results.Count == 1)
             return BuildFeedbackPrompt(results[0]);
 
-        var sb = new System.Text.StringBuilder();
+        StringBuilder sb = new System.Text.StringBuilder();
         sb.Append($"Queued batch executed ({results.Count} action(s)):");
         for (int i = 0; i < results.Count; i++)
             sb.Append($" {i + 1}) {results[i].Summary}");
@@ -283,7 +283,7 @@ public static class AgentPromptBuilder
     public static string BuildActionCancelledPrompt(IReadOnlyList<string> guidanceMessages)
     {
         ArgumentNullException.ThrowIfNull(guidanceMessages);
-        var sb = new System.Text.StringBuilder();
+        StringBuilder sb = new System.Text.StringBuilder();
         sb.AppendLine("[USER INTERRUPTION — ACTION CANCELLED]");
         sb.AppendLine("The user cancelled your last planned action before it was executed.");
         if (guidanceMessages.Count > 0)
@@ -300,10 +300,7 @@ public static class AgentPromptBuilder
     /// <summary>
     /// Produces the summarization prompt used during episodic context resets.
     /// </summary>
-    public static string BuildSummarizationPrompt()
-    {
-        return "Briefly summarize what you have accomplished so far and what remains to be done for the goal. Be concise — focus on the key actions taken and the current state of the screen.";
-    }
+    public static string BuildSummarizationPrompt() => "Briefly summarize what you have accomplished so far and what remains to be done for the goal. Be concise — focus on the key actions taken and the current state of the screen.";
 
     /// <summary>
     /// Produces the prompt used to restart the conversation after an episodic context reset,

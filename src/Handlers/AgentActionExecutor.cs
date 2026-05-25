@@ -75,7 +75,7 @@ public sealed partial class AgentActionExecutor(
         {
             LogFailedToExecute(logger, ex, action.Kind);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Execution Exception", Text: ex.ToString())).ConfigureAwait(false);
-            var errorResult = new ActionExecutionResult(false, $"Execution error: {ex.Message}", IsTerminal: false, GoalAchieved: false);
+            ActionExecutionResult errorResult = new ActionExecutionResult(false, $"Execution error: {ex.Message}", IsTerminal: false, GoalAchieved: false);
             return debugLog is { Count: > 0 } ? errorResult with { DebugEntries = debugLog } : errorResult;
         }
     }
@@ -94,13 +94,13 @@ public sealed partial class AgentActionExecutor(
         // If the alt mode is CurrentCursorPosition, skip coordinate resolution and click in place.
         if (action.AltMode == AgentActionAltMode.CurrentCursorPosition)
         {
-            var (curX, curY) = inputProvider.GetCursorPosition();
+            (int curX, int curY) = inputProvider.GetCursorPosition();
             LogActionAtCursorPosition(logger, action.Kind, curX, curY);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Current Cursor Position", Text: $"({curX}, {curY})")).ConfigureAwait(false);
 
             if (appConfig.General.EnableDebugMode && (debugLog is not null || onProgress is not null))
             {
-                var (imgX, imgY) = screenshot.ToImageRelative(curX, curY);
+                (int imgX, int imgY) = screenshot.ToImageRelative(curX, curY);
                 screenshot.Annotated = CoordinatePrompter.CreateAnnotatedImage_PixelCoords(screenshot.Processed, imgX, imgY);
                 await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Annotated Screenshot", ImageBase64: Convert.ToBase64String(screenshot.Annotated))).ConfigureAwait(false);
             }
@@ -248,7 +248,7 @@ public sealed partial class AgentActionExecutor(
                 };
             }
 
-            var coordSw = Stopwatch.StartNew();
+            Stopwatch coordSw = Stopwatch.StartNew();
             ScreenCoordinate coord = await coordinatePrompter
                 .GetCoordinatesForItemAsync(screenshot, target, onStepCompleted: onCoordStep, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
@@ -331,16 +331,16 @@ public sealed partial class AgentActionExecutor(
         long startCoordMs = 0, endCoordMs = 0;
         long? totalCoordMs = null;
 
-        if (action.AltMode == AgentActionAltMode.ExactCoords
-            || action.AltMode == AgentActionAltMode.CurrentCursorPositionStart
-            || action.AltMode == AgentActionAltMode.CurrentCursorPositionEnd
-            || action.AltMode == AgentActionAltMode.CurrentCursorPositionBoth)
+        if (action.AltMode is AgentActionAltMode.ExactCoords
+            or AgentActionAltMode.CurrentCursorPositionStart
+            or AgentActionAltMode.CurrentCursorPositionEnd
+            or AgentActionAltMode.CurrentCursorPositionBoth)
         {
             // Resolve start point
-            if (action.AltMode == AgentActionAltMode.CurrentCursorPositionStart
-                || action.AltMode == AgentActionAltMode.CurrentCursorPositionBoth)
+            if (action.AltMode is AgentActionAltMode.CurrentCursorPositionStart
+                or AgentActionAltMode.CurrentCursorPositionBoth)
             {
-                var (cx, cy) = inputProvider.GetCursorPosition();
+                (int cx, int cy) = inputProvider.GetCursorPosition();
                 startPx = cx;
                 startPy = cy;
                 await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Start (Current Cursor)", Text: $"({startPx}, {startPy})")).ConfigureAwait(false);
@@ -353,10 +353,10 @@ public sealed partial class AgentActionExecutor(
             }
 
             // Resolve end point
-            if (action.AltMode == AgentActionAltMode.CurrentCursorPositionEnd
-                || action.AltMode == AgentActionAltMode.CurrentCursorPositionBoth)
+            if (action.AltMode is AgentActionAltMode.CurrentCursorPositionEnd
+                or AgentActionAltMode.CurrentCursorPositionBoth)
             {
-                var (cx, cy) = inputProvider.GetCursorPosition();
+                (int cx, int cy) = inputProvider.GetCursorPosition();
                 endPx = cx;
                 endPy = cy;
                 await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag End (Current Cursor)", Text: $"({endPx}, {endPy})")).ConfigureAwait(false);
@@ -396,10 +396,10 @@ public sealed partial class AgentActionExecutor(
         // Emit a combined annotated screenshot showing both start (green) and end (red) crosshairs
         if (appConfig.General.EnableDebugMode && (debugLog is not null || onProgress is not null))
         {
-            int startImgX = startCoordAi?.ImageX ?? startPx - screenshot.OriginX;
-            int startImgY = startCoordAi?.ImageY ?? startPy - screenshot.OriginY;
-            int endImgX   = endCoordAi?.ImageX   ?? endPx   - screenshot.OriginX;
-            int endImgY   = endCoordAi?.ImageY   ?? endPy   - screenshot.OriginY;
+            int startImgX = startCoordAi?.ImageX ?? (startPx - screenshot.OriginX);
+            int startImgY = startCoordAi?.ImageY ?? (startPy - screenshot.OriginY);
+            int endImgX   = endCoordAi?.ImageX   ?? (endPx   - screenshot.OriginX);
+            int endImgY   = endCoordAi?.ImageY   ?? (endPy   - screenshot.OriginY);
             screenshot.Annotated = CoordinatePrompter.CreateAnnotatedImageDrag(
                 screenshot.Processed,
                 startImgX, startImgY,
@@ -454,7 +454,7 @@ public sealed partial class AgentActionExecutor(
             };
         }
 
-        var coordSw = Stopwatch.StartNew();
+        Stopwatch coordSw = Stopwatch.StartNew();
         ScreenCoordinate coord = await coordinatePrompter
             .GetCoordinatesForItemAsync(screenshot, target, onStepCompleted: onCoordStep, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
@@ -533,7 +533,7 @@ public sealed partial class AgentActionExecutor(
 
     private static string FormatKeyCombo(string key, bool ctrl, bool shift, bool alt, bool win)
     {
-        var parts = new List<string>(5);
+        List<string> parts = new List<string>(5);
         if (ctrl) parts.Add("Ctrl");
         if (shift) parts.Add("Shift");
         if (alt) parts.Add("Alt");

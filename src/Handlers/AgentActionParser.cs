@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 
 namespace Thio_Universal_Agent.Handlers;
 
@@ -102,8 +103,8 @@ public static class AgentActionParser
         // Group lines into per-action payloads.
         // A new action starts whenever a line begins with a known tool token.
         // Non-tool lines (e.g. CLICK_DRAG's From:/To: continuations) are appended to the current block.
-        var actionPayloads = new List<string>(maxQueueSize);
-        var currentBlock   = new System.Text.StringBuilder();
+        List<string> actionPayloads = new List<string>(maxQueueSize);
+        StringBuilder currentBlock   = new System.Text.StringBuilder();
 
         foreach (string line in lines)
         {
@@ -134,7 +135,7 @@ public static class AgentActionParser
             return false;
         }
 
-        var actions = new List<AgentAction>(actionPayloads.Count);
+        List<AgentAction> actions = new List<AgentAction>(actionPayloads.Count);
         foreach (string payload in actionPayloads)
         {
             if (!TryParseActionLine(payload, out AgentAction? act, out error))
@@ -279,7 +280,7 @@ public static class AgentActionParser
         string kindUpper = kind.ToString().ToUpperInvariant();
 
         // Strip optional leading modifier prefix, e.g. "ctrl+shift " from "ctrl+shift COORDS 100,200"
-        var (modifiers, strippedArgs) = TryStripModifierPrefix(args);
+        (ModifierKeys modifiers, string? strippedArgs) = TryStripModifierPrefix(args);
         args = strippedArgs;
 
         // Handle COORDS keyword: e.g. LEFT_CLICK COORDS 100,200  or  LEFT_CLICK COORDS CURRENT

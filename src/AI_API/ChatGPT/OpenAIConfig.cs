@@ -20,5 +20,8 @@ public class OpenAIConfig : IAiProviderConfig
 
     public OpenAIConfig() { }
 
-    public OpenAIConfig(IConfigurationSection section) => ConfigSectionBinder.Bind(this, section);
+    public OpenAIConfig(IConfigurationSection section)
+    {
+        ConfigSectionBinder.Bind(this, section);
+    }
 }

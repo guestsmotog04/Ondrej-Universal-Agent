@@ -22,7 +22,7 @@ internal static class ConfigEndpoints
 
         app.MapGet("/api/config", (AppConfig appConfig) =>
         {
-            var response = new AppConfigResponse(
+            AppConfigResponse response = new AppConfigResponse(
                 General: new GeneralConfigDto(
                         ActiveProvider:     appConfig.General.ActiveProvider.ToString(),
                         SettleDelayMs:      appConfig.General.SettleDelayMs,
@@ -39,8 +39,8 @@ internal static class ConfigEndpoints
                 Gemini: new GeminiConfigDto(
                     Model:                     appConfig.Gemini.Model,
                     MediaResolution:           appConfig.Gemini.MediaResolution.ToString(),
-                    Temperature:               (double?)appConfig.Gemini.Temperature,
-                    TopP:                      (double?)appConfig.Gemini.TopP,
+                    Temperature:               appConfig.Gemini.Temperature,
+                    TopP:                      appConfig.Gemini.TopP,
                     TopK:                      appConfig.Gemini.TopK,
                     CoordinateMaxOutputTokens: appConfig.Gemini.CoordinateMaxOutputTokens,
                     ThinkingBudget:            appConfig.Gemini.ThinkingBudget,
@@ -48,12 +48,12 @@ internal static class ConfigEndpoints
                 ),
                 OpenAI: new OpenAIConfigDto(
                     Model:           appConfig.OpenAI.Model,
-                    Temperature:     (double?)appConfig.OpenAI.Temperature,
+                    Temperature:     appConfig.OpenAI.Temperature,
                     MaxOutputTokens: appConfig.OpenAI.MaxOutputTokens
                 ),
                 Anthropic: new AnthropicConfigDto(
                     Model:           appConfig.Anthropic.Model,
-                    Temperature:     (double?)appConfig.Anthropic.Temperature,
+                    Temperature:     appConfig.Anthropic.Temperature,
                     MaxOutputTokens: appConfig.Anthropic.MaxOutputTokens
                 ),
                 Hotkeys: new HotkeyConfigDto(
@@ -70,7 +70,7 @@ internal static class ConfigEndpoints
 
         app.MapGet("/api/config/schema", (AppConfig appConfig) =>
         {
-            var sections = new object[]
+            object[] sections = new object[]
             {
                 BuildSection("general",   "General",   appConfig.General,   isProvider: false),
                 BuildSection("gemini",    "Gemini",    appConfig.Gemini,    isProvider: true),
@@ -86,12 +86,12 @@ internal static class ConfigEndpoints
 
         app.MapPost("/api/config", (JsonElement body, AppConfig appConfig, HotkeyService? hotkeyService) =>
         {
-            if (body.TryGetProperty("general", out var generalEl)) ApplyUpdates(appConfig.General, generalEl);
-            if (body.TryGetProperty("gemini", out var geminiEl)) ApplyUpdates(appConfig.Gemini, geminiEl);
-            if (body.TryGetProperty("openai", out var openaiEl)) ApplyUpdates(appConfig.OpenAI, openaiEl);
-            if (body.TryGetProperty("anthropic", out var anthropicEl)) ApplyUpdates(appConfig.Anthropic, anthropicEl);
-            if (body.TryGetProperty("agent", out var agentEl)) ApplyUpdates(appConfig.Agent, agentEl);
-            if (body.TryGetProperty("hotkeys", out var hotkeysEl))
+            if (body.TryGetProperty("general", out JsonElement generalEl)) ApplyUpdates(appConfig.General, generalEl);
+            if (body.TryGetProperty("gemini", out JsonElement geminiEl)) ApplyUpdates(appConfig.Gemini, geminiEl);
+            if (body.TryGetProperty("openai", out JsonElement openaiEl)) ApplyUpdates(appConfig.OpenAI, openaiEl);
+            if (body.TryGetProperty("anthropic", out JsonElement anthropicEl)) ApplyUpdates(appConfig.Anthropic, anthropicEl);
+            if (body.TryGetProperty("agent", out JsonElement agentEl)) ApplyUpdates(appConfig.Agent, agentEl);
+            if (body.TryGetProperty("hotkeys", out JsonElement hotkeysEl))
             {
                 ApplyUpdates(appConfig.Hotkeys, hotkeysEl);
                 hotkeyService?.ReloadHotkeys();
@@ -105,15 +105,15 @@ internal static class ConfigEndpoints
     /// <summary>Builds a schema section object by reflecting over <see cref="ConfigFieldAttribute"/>-annotated properties.</summary>
     private static object BuildSection(string key, string label, object obj, bool isProvider)
     {
-        var fields = new List<object>();
+        List<object> fields = new List<object>();
 
-        foreach (var prop in obj.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        foreach (PropertyInfo prop in obj.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
-            var attr = prop.GetCustomAttribute<ConfigFieldAttribute>();
+            ConfigFieldAttribute? attr = prop.GetCustomAttribute<ConfigFieldAttribute>();
             if (attr is null) continue;
 
-            var propType   = prop.PropertyType;
-            var underlying = Nullable.GetUnderlyingType(propType) ?? propType;
+            Type propType   = prop.PropertyType;
+            Type underlying = Nullable.GetUnderlyingType(propType) ?? propType;
             bool nullable  = Nullable.GetUnderlyingType(propType) != null
                              || (propType == typeof(string)); // string is a reference type
 
@@ -130,9 +130,12 @@ internal static class ConfigEndpoints
                 fieldType = "enum";
                 options = Enum.GetNames(underlying);
             }
-            else fieldType = "string";
+            else
+            {
+                fieldType = "string";
+            }
 
-            var raw   = prop.GetValue(obj);
+            object? raw   = prop.GetValue(obj);
             object? value = raw is Enum e ? e.ToString() : raw;
 
             string? defaultTemplate = fieldType == "prompt-template"
@@ -163,14 +166,14 @@ internal static class ConfigEndpoints
     {
         if (updates.ValueKind != JsonValueKind.Object) return;
 
-        foreach (var prop in updates.EnumerateObject())
+        foreach (JsonProperty prop in updates.EnumerateObject())
         {
-            var pi = target.GetType().GetProperty(
+            PropertyInfo? pi = target.GetType().GetProperty(
                 prop.Name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
             if (pi is null || !pi.CanWrite) continue;
 
-            var propType   = pi.PropertyType;
-            var underlying = Nullable.GetUnderlyingType(propType) ?? propType;
+            Type propType   = pi.PropertyType;
+            Type underlying = Nullable.GetUnderlyingType(propType) ?? propType;
 
             try
             {

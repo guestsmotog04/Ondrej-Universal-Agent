@@ -1,7 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.IO;
 
 namespace Thio_Universal_Agent;
 
@@ -161,10 +160,7 @@ public class SecretsHandler : ISecretProvider
         File.WriteAllText(_vaultFilePath, json);
     }
 
-    private static byte[] DeriveKey(byte[] passwordHashEntropy)
-    {
-        return Rfc2898DeriveBytes.Pbkdf2(passwordHashEntropy, AppSalt, 100_000, HashAlgorithmName.SHA256, 32);
-    }
+    private static byte[] DeriveKey(byte[] passwordHashEntropy) => Rfc2898DeriveBytes.Pbkdf2(passwordHashEntropy, AppSalt, 100_000, HashAlgorithmName.SHA256, 32);
 
     private sealed record VaultEntry(string IV, string Ciphertext);  // internal file format — not exposed via API
 }

@@ -117,27 +117,29 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider
         if (_hwnd == IntPtr.Zero)
             throw new ObjectDisposedException(nameof(WindowsHotkeyProvider));
 
-        var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<int> tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // WM_APP + id encodes the registration request; WndProc picks it up on the pump thread.
         // We pass virtualKey in the low word of lParam and modifiers in the high word.
         uint lParamValue = ((uint)modifiers << 16) | ((uint)virtualKey & 0xFFFF);
         _pendingRegistrations[(id, (int)lParamValue)] = tcs;
-        PostMessage(_hwnd, WM_APP_REGISTER, (IntPtr)id, (IntPtr)(int)lParamValue);
+        PostMessage(_hwnd, WM_APP_REGISTER, id, (int)lParamValue);
 
         // Block the caller until registration succeeds or throws.
         int error = tcs.Task.GetAwaiter().GetResult();
         if (error != 0)
+        {
             throw new InvalidOperationException(
                 $"RegisterHotKey failed for id={id} (Win32 error {error}). " +
                 $"The hotkey combination may already be registered by another application.");
+        }
     }
 
     /// <inheritdoc/>
     public void UnregisterHotkey(int id)
     {
         if (_hwnd != IntPtr.Zero)
-            PostMessage(_hwnd, WM_APP_UNREGISTER, (IntPtr)id, IntPtr.Zero);
+            PostMessage(_hwnd, WM_APP_UNREGISTER, id, IntPtr.Zero);
     }
 
     public void Dispose()
@@ -165,7 +167,7 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider
         const string className = "TUA_HotkeyWindow";
 
         // Register a minimal window class.
-        var wc = new WNDCLASSEX
+        WNDCLASSEX wc = new WNDCLASSEX
         {
             cbSize      = (uint)Marshal.SizeOf<WNDCLASSEX>(),
             lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate),
@@ -210,8 +212,8 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider
                 int error = ok ? 0 : Marshal.GetLastWin32Error();
 
                 // Signal the waiting caller.
-                var key = (id, encoded);
-                if (_pendingRegistrations.TryRemove(key, out var tcs))
+                (int id, int encoded) key = (id, encoded);
+                if (_pendingRegistrations.TryRemove(key, out TaskCompletionSource<int>? tcs))
                     tcs.SetResult(error);
 
                 return IntPtr.Zero;
@@ -223,7 +225,7 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider
 
             case WM_CLOSE:
                 // Unregister everything before the pump exits.
-                foreach (var key in _pendingRegistrations.Keys)
+                foreach ((int, int) key in _pendingRegistrations.Keys)
                     UnregisterHotKey(hWnd, key.Item1);
                 PostMessage(hWnd, 0x0012 /* WM_QUIT */, IntPtr.Zero, IntPtr.Zero);
                 return IntPtr.Zero;

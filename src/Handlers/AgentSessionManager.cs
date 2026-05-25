@@ -19,7 +19,7 @@ public sealed class AgentSessionManager(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(goal);
 
-        var session = new AgentSession { Goal = goal };
+        AgentSession session = new AgentSession { Goal = goal };
         _sessions[session.SessionId] = session;
 
         logger.LogInformation("Starting agent session {SessionId} with goal: \"{Goal}\".", session.SessionId, goal);

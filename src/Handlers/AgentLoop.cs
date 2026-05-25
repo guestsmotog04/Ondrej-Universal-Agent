@@ -38,16 +38,16 @@ public sealed partial class AgentLoop(
 
         try
         {
-            var screenshot = screenProvider.CaptureScreen();
+            Screenshot screenshot = screenProvider.CaptureScreen();
             //TODO: Add a config for whether to add grid overlay to regular conversation screenshots. For now default to true
             screenshot.Processed = CoordinatePrompter.CreateFullGridOverlayImage(screenshot.Original, appConfig);
 
             string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(session.Goal, appConfig.General.MaxQueueSize, appConfig.General.SystemPromptTemplate);
-            var conversation = new AiConversation();
+            AiConversation conversation = new AiConversation();
 
             LogSessionStarted(logger, session.SessionId, session.Goal);
 
-            var initialAiSw = Stopwatch.StartNew();
+            Stopwatch initialAiSw = Stopwatch.StartNew();
             AiResponse response = await aiProvider.ContinueConversationAsync(conversation, systemPrompt, screenshot.Processed, ScreenMimeType, ct)
                 .ConfigureAwait(false);
             initialAiSw.Stop();
@@ -93,20 +93,20 @@ public sealed partial class AgentLoop(
                 }
 
                 // Parse the AI's response (with retries on malformed output)
-                var stepStopwatch = Stopwatch.StartNew();
-                var parseSw = Stopwatch.StartNew();
-                var (parsed, parseRejections) = await TryParseWithRetriesAsync(
+                Stopwatch stepStopwatch = Stopwatch.StartNew();
+                Stopwatch parseSw = Stopwatch.StartNew();
+                (AgentParsedResponse? parsed, List<(string RawText, string Error)>? parseRejections) = await TryParseWithRetriesAsync(
                     conversation, response.Text, ct, debugLog).ConfigureAwait(false);
                 parseSw.Stop();
 
                 // Emit a separate red step entry for each rejected attempt so they're visible in the log.
                 if (parseRejections is not null)
                 {
-                    foreach (var (rawText, rejectionError) in parseRejections)
+                    foreach ((string? rawText, string? rejectionError) in parseRejections)
                     {
-                        var rejectedAction = new AgentAction(AgentActionKind.Fail, Reason: rejectionError);
-                        var rejectedResult = new ActionExecutionResult(false, rejectionError, IsTerminal: false, GoalAchieved: false);
-                        var rejectedStep = new AgentStep(step, rawText, rejectedAction, rejectedResult,
+                        AgentAction rejectedAction = new AgentAction(AgentActionKind.Fail, Reason: rejectionError);
+                        ActionExecutionResult rejectedResult = new ActionExecutionResult(false, rejectionError, IsTerminal: false, GoalAchieved: false);
+                        AgentStep rejectedStep = new AgentStep(step, rawText, rejectedAction, rejectedResult,
                             DateTimeOffset.UtcNow, 0, IsParseRejected: true);
                         session.Steps.Add(rejectedStep);
                         await session.RaiseStepCompletedAsync(rejectedStep).ConfigureAwait(false);
@@ -120,9 +120,9 @@ public sealed partial class AgentLoop(
                     LogParseFailures(logger, session.SessionId);
 
                     // Commit a terminal fail step so the UI knows the session ended here.
-                    var failAction = new AgentAction(AgentActionKind.Fail, Reason: "Unparseable AI response");
-                    var failResult = new ActionExecutionResult(false, "Parse failed after retries.", IsTerminal: true, GoalAchieved: false);
-                    var failStep = new AgentStep(step, "(parse failure)", failAction, failResult, DateTimeOffset.UtcNow, stepStopwatch.ElapsedMilliseconds,
+                    AgentAction failAction = new AgentAction(AgentActionKind.Fail, Reason: "Unparseable AI response");
+                    ActionExecutionResult failResult = new ActionExecutionResult(false, "Parse failed after retries.", IsTerminal: true, GoalAchieved: false);
+                    AgentStep failStep = new AgentStep(step, "(parse failure)", failAction, failResult, DateTimeOffset.UtcNow, stepStopwatch.ElapsedMilliseconds,
                         debugLog is { Count: > 0 } ? debugLog : null);
                     session.Steps.Add(failStep);
                     await session.RaiseStepCompletedAsync(failStep).ConfigureAwait(false);
@@ -145,7 +145,7 @@ public sealed partial class AgentLoop(
                 // Emit ONE preview for the whole batch — UI shows the first action and a queue badge.
                 // This is intentionally done BEFORE the pause gate so the user can see the AI's
                 // plan even while the session is paused.
-                var preview = new AgentStepPreview(step, parsed.Thought, actionsToRun[0], actionsToRun.Count);
+                AgentStepPreview preview = new AgentStepPreview(step, parsed.Thought, actionsToRun[0], actionsToRun.Count);
                 await session.RaiseStepStartingAsync(preview).ConfigureAwait(false);
 
                 // If the user paused while the AI was responding, block here until resumed.
@@ -160,9 +160,9 @@ public sealed partial class AgentLoop(
                 // execution entirely, emit a cancelled step to the log, then redirect the AI.
                 if (session.ConsumeCancelNextAction())
                 {
-                    var cancelledResult = new ActionExecutionResult(false, "Action cancelled by user.", IsTerminal: false, GoalAchieved: false);
-                    var cancelTimings = new StepTimings(lastAiResponseMs, parseSw.ElapsedMilliseconds, 0, null);
-                    var cancelledStep = new AgentStep(step, parsed.Thought, actionsToRun[0], cancelledResult,
+                    ActionExecutionResult cancelledResult = new ActionExecutionResult(false, "Action cancelled by user.", IsTerminal: false, GoalAchieved: false);
+                    StepTimings cancelTimings = new StepTimings(lastAiResponseMs, parseSw.ElapsedMilliseconds, 0, null);
+                    AgentStep cancelledStep = new AgentStep(step, parsed.Thought, actionsToRun[0], cancelledResult,
                         DateTimeOffset.UtcNow, parseSw.ElapsedMilliseconds,
                         debugLog is { Count: > 0 } ? debugLog : null, cancelTimings);
                     session.Steps.Add(cancelledStep);
@@ -173,13 +173,13 @@ public sealed partial class AgentLoop(
                     screenshot.Processed = CoordinatePrompter.CreateFullGridOverlayImage(screenshot.Original, appConfig);
 
                     // Drain guidance (may include the cancellation message itself) and tell the AI.
-                    var cancelGuidance = new List<string>();
+                    List<string> cancelGuidance = new List<string>();
                     session.DrainGuidance(cancelGuidance);
                     string cancelFeedback = AgentPromptBuilder.BuildActionCancelledPrompt(cancelGuidance);
 
                     if (debugging) lastPromptSent = cancelFeedback;
 
-                    var cancelAiSw = Stopwatch.StartNew();
+                    Stopwatch cancelAiSw = Stopwatch.StartNew();
                     response = await aiProvider.ContinueConversationAsync(
                         conversation, cancelFeedback, screenshot.Processed, ScreenMimeType, ct).ConfigureAwait(false);
                     cancelAiSw.Stop();
@@ -207,7 +207,7 @@ public sealed partial class AgentLoop(
                     await session.RaiseSubStepUpdateAsync(new AgentSubStep(step, entry)).ConfigureAwait(false);
                 }
 
-                var batchResults = new List<ActionExecutionResult>(actionsToRun.Count);
+                List<ActionExecutionResult> batchResults = new List<ActionExecutionResult>(actionsToRun.Count);
                 List<QueuedSubStep>? subSteps = isBatch ? new(actionsToRun.Count) : null;
                 bool batchTerminated = false;
 
@@ -220,7 +220,7 @@ public sealed partial class AgentLoop(
                     // First action shares the main debugLog; each subsequent action gets its own segment.
                     List<AgentDebugEntry>? qiDebugLog = qi == 0 ? debugLog : (debugging ? [] : null);
 
-                    var executeSw = Stopwatch.StartNew();
+                    Stopwatch executeSw = Stopwatch.StartNew();
                     ActionExecutionResult result = await ExecuteWithTargetRecoveryAsync(
                         currentAction, screenshot, conversation, ct, qiDebugLog, executorProgress).ConfigureAwait(false);
                     executeSw.Stop();
@@ -230,7 +230,7 @@ public sealed partial class AgentLoop(
 
                     if (isBatch)
                     {
-                        var subTimings = new StepTimings(
+                        StepTimings subTimings = new StepTimings(
                             AiResponseMs:      qi == 0 ? lastAiResponseMs : 0,
                             ParseMs:           qi == 0 ? parseSw.ElapsedMilliseconds : 0,
                             ExecutionMs:       executeSw.ElapsedMilliseconds,
@@ -257,17 +257,19 @@ public sealed partial class AgentLoop(
                 ActionExecutionResult lastResult = batchResults[^1];
 
                 if (debugging && isBatch)
+                {
                     debugLog!.Add(new AgentDebugEntry("Batch Result",
                         Text: $"Executed {batchResults.Count}/{actionsToRun.Count} action(s). Terminal={batchTerminated}"));
+                }
 
-                var stepTimings = new StepTimings(
+                StepTimings stepTimings = new StepTimings(
                     AiResponseMs:      lastAiResponseMs,
                     ParseMs:           parseSw.ElapsedMilliseconds,
                     ExecutionMs:       stepStopwatch.ElapsedMilliseconds - parseSw.ElapsedMilliseconds,
                     CoordResolutionMs: isBatch ? null : lastResult.CoordResolutionMs);
 
                 // Emit ONE completed step for the entire batch.
-                var agentStep = new AgentStep(step, parsed.Thought, actionsToRun[0], lastResult,
+                AgentStep agentStep = new AgentStep(step, parsed.Thought, actionsToRun[0], lastResult,
                     DateTimeOffset.UtcNow, stepStopwatch.ElapsedMilliseconds,
                     debugLog is { Count: > 0 } ? debugLog : null,
                     stepTimings,
@@ -308,11 +310,11 @@ public sealed partial class AgentLoop(
 
                 // Prepend any user guidance messages that arrived since the last step.
                 // (Skip if cancel-next-action was already set — that path drains guidance separately.)
-                var guidanceMessages = new List<string>();
+                List<string> guidanceMessages = new List<string>();
                 if (!session.HasCancelNextAction && session.DrainGuidance(guidanceMessages))
                     feedback = AgentPromptBuilder.BuildGuidancePrompt(guidanceMessages) + feedback;
 
-                var aiFeedbackSw = Stopwatch.StartNew();
+                Stopwatch aiFeedbackSw = Stopwatch.StartNew();
                 response = await aiProvider.ContinueConversationAsync(
                     conversation, feedback, screenshot.Processed, ScreenMimeType, ct).ConfigureAwait(false);
                 aiFeedbackSw.Stop();
@@ -430,12 +432,12 @@ public sealed partial class AgentLoop(
             LogTargetResolutionFailed(logger, action.Target, result.Summary);
 
             string recovery = AgentPromptBuilder.BuildTargetNotFoundPrompt(action.Target);
-            var recoveryEntry = new AgentDebugEntry("Target Not Found — Recovery Prompt", Text: recovery);
+            AgentDebugEntry recoveryEntry = new AgentDebugEntry("Target Not Found — Recovery Prompt", Text: recovery);
             debugLog?.Add(recoveryEntry);
             if (onProgress is not null) await onProgress(recoveryEntry).ConfigureAwait(false);
 
             AiResponse recoveryResponse = await aiProvider.ContinueConversationAsync(conversation, recovery, ct).ConfigureAwait(false);
-            var responseEntry = new AgentDebugEntry("Target Not Found — AI Recovery Response", Text: recoveryResponse.Text);
+            AgentDebugEntry responseEntry = new AgentDebugEntry("Target Not Found — AI Recovery Response", Text: recoveryResponse.Text);
             debugLog?.Add(responseEntry);
             if (onProgress is not null) await onProgress(responseEntry).ConfigureAwait(false);
         }
@@ -470,7 +472,7 @@ public sealed partial class AgentLoop(
         debugLog?.Add(new AgentDebugEntry("Context Reset — AI Summary", Text: summary));
 
         // Start a fresh conversation with the summary baked in
-        var newConversation = new AiConversation();
+        AiConversation newConversation = new AiConversation();
         string resetPrompt = AgentPromptBuilder.BuildContextResetPrompt(goal, summary, appConfig.General.MaxQueueSize, appConfig.General.SystemPromptTemplate);
         debugLog?.Add(new AgentDebugEntry("Context Reset — New System Prompt", Text: resetPrompt));
 

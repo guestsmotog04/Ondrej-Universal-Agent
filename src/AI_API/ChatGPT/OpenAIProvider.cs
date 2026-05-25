@@ -1,6 +1,5 @@
 // src/AI_API/OpenAI/OpenAIProvider.cs
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -51,7 +50,7 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
         ArgumentNullException.ThrowIfNull(imageBytes);
 
-        var request = new OpenAIRequest(
+        OpenAIRequest request = new OpenAIRequest(
             _model,
             Messages: [
                 new OpenAIMessage(
@@ -140,7 +139,7 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
 
     private async Task<AiResponse> ContinueConversationCoreAsync(AiConversation conversation, AiChatMessage userMessage, CancellationToken cancellationToken, AiRequestOptions? options)
     {
-        var request = BuildRequest(conversation, userMessage, options);
+        OpenAIRequest request = BuildRequest(conversation, userMessage, options);
         AiResponse response = await SendRequestAsync(request, cancellationToken).ConfigureAwait(false);
 
         if (response.Success)
@@ -154,7 +153,7 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
 
     private async Task<AiResponse> SendRequestAsync(OpenAIRequest request, CancellationToken cancellationToken)
     {
-        var apiKey = _apiKey ?? appConfig.OpenAI.ApiKey;
+        string? apiKey = _apiKey ?? appConfig.OpenAI.ApiKey;
 
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new InvalidOperationException("OpenAI:ApiKey is not configured. Provide an API key via the web UI.");
@@ -176,8 +175,8 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
             return new AiResponse(false, string.Empty, $"HTTP {(int)response.StatusCode}: {errorBody}");
         }
 
-        var openAiResponse = await response.Content.ReadFromJsonAsync<OpenAIResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
-        var text = openAiResponse?.Choices?.FirstOrDefault()?.Message?.Content;
+        OpenAIResponse? openAiResponse = await response.Content.ReadFromJsonAsync<OpenAIResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+        string? text = openAiResponse?.Choices?.FirstOrDefault()?.Message?.Content;
 
         if (string.IsNullOrWhiteSpace(text))
             return new AiResponse(false, string.Empty, "OpenAI returned an empty response.");
@@ -188,7 +187,7 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
     private OpenAIRequest BuildRequest(AiConversation conversation, AiChatMessage additionalMessage, AiRequestOptions? options)
     {
         bool stripHistoryImages = appConfig.General.StripHistoryImages;
-        var messages = new List<OpenAIMessage>(conversation.Messages.Count + 1);
+        List<OpenAIMessage> messages = new List<OpenAIMessage>(conversation.Messages.Count + 1);
 
         foreach (AiChatMessage message in conversation.Messages)
             messages.Add(ToOpenAIMessage(message: message, stripImages: stripHistoryImages));
@@ -205,8 +204,8 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
 
     private static OpenAIMessage ToOpenAIMessage(AiChatMessage message, bool stripImages)
     {
-        var role = message.Role == AiChatRole.User ? "user" : "assistant";
-        var content = new List<OpenAIContentPart>();
+        string role = message.Role == AiChatRole.User ? "user" : "assistant";
+        List<OpenAIContentPart> content = new List<OpenAIContentPart>();
 
         if (message.Text is not null)
         {

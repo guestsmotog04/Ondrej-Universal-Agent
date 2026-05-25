@@ -77,7 +77,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         //public static readonly CoordResponseCode UNKNOWN = new(code: "", isStandalone: true); // Default to COORDS if not sure
 
         // ---------- Public Methods ----------
-        public static List<string> AllCodeStrings { get { return _allStrings; } }
+        public static List<string> AllCodeStrings => _allStrings;
 
         // Input a list of strings and get back any matched commands
         public static List<CoordResponseCode> GetFromStrings(List<string> codes)
@@ -93,13 +93,14 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         }
 
         // Overload allowing input of a single string. Still returns a list, but if it's not found it will be empty.
-        public static List<CoordResponseCode> GetFromStrings(string code)
-        {
-            return GetFromStrings([code]);
-        }
+        public static List<CoordResponseCode> GetFromStrings(string code) => GetFromStrings([code]);
 
         // Allow the class type to be used as a string where it returns the Code property
-        public static implicit operator string(CoordResponseCode c) => c.Code;
+        public static implicit operator string(CoordResponseCode c)
+        {
+            return c.Code;
+        }
+
         public override string ToString() => Code;
     }
 
@@ -141,7 +142,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         string prompt = MakeCoordinatePrompt(itemToIdentify);
 
         // Start the conversation with the prompt + initial grid image
-        var conversation = new AiConversation();
+        AiConversation conversation = new AiConversation();
 
         // -------------- LOCAL FUNCTION - To be used upon failure --------------
         GridCoordinate RetryWithRecoveryInstructions(ParseFailReason? failReason, string previousResponse)
@@ -223,9 +224,12 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
             if (!response.Success)
             {
                 if (onStepCompleted is not null)
+                {
                     await onStepCompleted(new CoordinateStep(
                         stepNumber, zoomedImage, response.ErrorMessage ?? "(failed)", null, null, zoomedImage))
                         .ConfigureAwait(false);
+                }
+
                 break;
             }
 
@@ -253,7 +257,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
                 coordinate = parsed;
         }
 
-        var (screenX, screenY) = CalculateScreenCoordinates(view, coordinate, divisions, divisions);
+        (double screenX, double screenY) = CalculateScreenCoordinates(view, coordinate, divisions, divisions);
         return (screenX, screenY, null, null);
     }
 
@@ -328,7 +332,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
                 throw new ArgumentException("Normalized width and height must be provided when useNormalization is true.");
         }
 
-        var conversation = new AiConversation();
+        AiConversation conversation = new AiConversation();
         string prompt = MakeDirectCoordinatePrompt(itemToIdentify, normalizedWidth.Value, normalizedHeight.Value);
 
         AiResponse response = await aiProvider.ContinueConversationAsync(
@@ -338,8 +342,11 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         if (!response.Success)
         {
             if (onStepCompleted is not null)
+            {
                 await onStepCompleted(new CoordinateStep(1, screenshot.Processed, response.ErrorMessage ?? "(failed)", null, null, screenshot.Processed))
                     .ConfigureAwait(false);
+            }
+
             throw new InvalidOperationException($"AI request failed in Direct mode: {response.ErrorMessage}");
         }
 
@@ -349,8 +356,10 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
             throw new InvalidOperationException("The AI could not find the requested item. Please give an alternative description.");
 
         if (coordinate is null)
+        {
             throw new InvalidOperationException($"AI failed to provide valid coordinates in Direct mode. Parsing failure: {failReason?.Details}." +
                 $"\nAI response was: '{response.Text}'");
+        }
 
         // Un-normalize before annotating so the crosshair is drawn at the true pixel location.
         double? normX = null;
@@ -650,7 +659,10 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
                 return null;
             if (!double.TryParse(parts[0], CultureInfo.InvariantCulture, out double x) ||
                 !double.TryParse(parts[1], CultureInfo.InvariantCulture, out double y))
+            {
                 return null;
+            }
+
             return new GridCoordinate(x, y);
         }
 
@@ -672,8 +684,8 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         int rows = Screenshot.DefaultDivisions
         )
     {
-        double screenX = currentView.X + (coordinate.X / cols) * currentView.Width;
-        double screenY = currentView.Y + (coordinate.Y / rows) * currentView.Height;
+        double screenX = currentView.X + ((coordinate.X / cols) * currentView.Width);
+        double screenY = currentView.Y + ((coordinate.Y / rows) * currentView.Height);
 
         return (screenX, screenY);
     }

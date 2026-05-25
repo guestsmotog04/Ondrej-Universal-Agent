@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Thio_Universal_Agent;
 
 namespace Thio_Universal_Agent.Endpoints;
 
@@ -15,7 +14,7 @@ internal static class AgentEndpoints
 
     internal static void MapAgentEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/api/agent");
+        RouteGroupBuilder group = app.MapGroup("/api/agent");
 
         // Check if verbose debug output is enabled
         group.MapGet("/debug-enabled", (AppConfig appConfig) => Results.Ok(new { enabled = appConfig.General.EnableDebugMode }));
@@ -30,17 +29,17 @@ internal static class AgentEndpoints
             if (string.IsNullOrWhiteSpace(req.Goal))
                 return Results.BadRequest(new { error = "Goal is required." });
 
-            var activeProvider = appConfig.General.ActiveProvider;
+            AiProviderType activeProvider = appConfig.General.ActiveProvider;
 
             // Use the per-request key if provided; otherwise fall back to whatever is already in AppConfig for the active provider.
-            var defaultKey = activeProvider switch
+            string? defaultKey = activeProvider switch
             {
                 AiProviderType.ChatGPT => appConfig.OpenAI.ApiKey,
                 AiProviderType.Claude => appConfig.Anthropic.ApiKey,
                 _ => appConfig.Gemini.ApiKey
             };
 
-            var resolvedKey = string.IsNullOrWhiteSpace(req.ApiKey) ? defaultKey : req.ApiKey;
+            string? resolvedKey = string.IsNullOrWhiteSpace(req.ApiKey) ? defaultKey : req.ApiKey;
             if (string.IsNullOrWhiteSpace(resolvedKey))
                 return Results.BadRequest(new { error = "No API key found. Set one in Configuration or enter it here." });
 
@@ -90,7 +89,7 @@ internal static class AgentEndpoints
                 completedAt = session.CompletedAt,
                 totalDurationMs = session.CompletedAt.HasValue
                     ? (long)(session.CompletedAt.Value - session.StartedAt).TotalMilliseconds
-                    : (long?)(null),
+                    : (long?)null,
             });
         });
 
@@ -137,7 +136,7 @@ internal static class AgentEndpoints
             }
 
             // Subscribe to future steps
-            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             async Task OnSubStepUpdate(AgentSubStep subStep)
             {
@@ -420,7 +419,7 @@ internal static class AgentEndpoints
             finalResult = session.FinalResult,
             totalDurationMs = session.CompletedAt.HasValue
                 ? (long)(session.CompletedAt.Value - session.StartedAt).TotalMilliseconds
-                : (long?)(null),
+                : (long?)null,
         };
 
         string json = JsonSerializer.Serialize(payload, JsonOptions);

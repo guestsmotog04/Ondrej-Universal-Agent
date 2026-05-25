@@ -36,10 +36,7 @@ public sealed partial class CoordinatePrompter
     }
 
     /// <summary>Decodes raw image bytes into an <see cref="IImage"/> for use with the canvas.</summary>
-    private static SkiaImage LoadImage(byte[] imageBytes)
-    {
-        return new SkiaImage(SKBitmap.Decode(imageBytes));
-    }
+    private static SkiaImage LoadImage(byte[] imageBytes) => new SkiaImage(SKBitmap.Decode(imageBytes));
 
     /// <summary>Computes the label font size used for axis labels.</summary>
     private static float ComputeLabelSize(int imageWidth)
@@ -90,7 +87,7 @@ public sealed partial class CoordinatePrompter
         int maxDigits = maxLabelValue.ToString(CultureInfo.InvariantCulture).Length;
         float maxTextW = labelSize * maxDigits * 0.75f;
         float padding = Math.Max(4f, labelSize * 0.25f);
-        return (int)Math.Ceiling(Math.Max(maxTextW, textH) / 2f + padding);
+        return (int)Math.Ceiling((Math.Max(maxTextW, textH) / 2f) + padding);
     }
 
 
@@ -105,7 +102,7 @@ public sealed partial class CoordinatePrompter
         int w = (int)image.Width;
         int h = (int)image.Height;
 
-        using var context = new SkiaBitmapExportContext(w, h, 1.0f);
+        using SkiaBitmapExportContext context = new SkiaBitmapExportContext(w, h, 1.0f);
         ICanvas canvas = context.Canvas;
 
         canvas.DrawImage(image, 0, 0, w, h);
@@ -122,7 +119,7 @@ public sealed partial class CoordinatePrompter
         canvas.DrawLine(cx - crossLen, cy, cx + crossLen, cy);
         canvas.DrawLine(cx, cy - crossLen, cx, cy + crossLen);
 
-        using var ms = new MemoryStream();
+        using MemoryStream ms = new MemoryStream();
         context.WriteToStream(ms);
         return ms.ToArray();
     }
@@ -139,7 +136,7 @@ public sealed partial class CoordinatePrompter
         int w = (int)image.Width;
         int h = (int)image.Height;
 
-        using var context = new SkiaBitmapExportContext(w, h, 1.0f);
+        using SkiaBitmapExportContext context = new SkiaBitmapExportContext(w, h, 1.0f);
         ICanvas canvas = context.Canvas;
 
         canvas.DrawImage(image, 0, 0, w, h);
@@ -162,12 +159,12 @@ public sealed partial class CoordinatePrompter
         canvas.StrokeColor = Color.FromArgb("#CCF0C040");
         canvas.DrawLine(
             (float)endX, (float)endY,
-            (float)(endX - arrowLen * Math.Cos(angle - arrowSpread)),
-            (float)(endY - arrowLen * Math.Sin(angle - arrowSpread)));
+            (float)(endX - (arrowLen * Math.Cos(angle - arrowSpread))),
+            (float)(endY - (arrowLen * Math.Sin(angle - arrowSpread))));
         canvas.DrawLine(
             (float)endX, (float)endY,
-            (float)(endX - arrowLen * Math.Cos(angle + arrowSpread)),
-            (float)(endY - arrowLen * Math.Sin(angle + arrowSpread)));
+            (float)(endX - (arrowLen * Math.Cos(angle + arrowSpread))),
+            (float)(endY - (arrowLen * Math.Sin(angle + arrowSpread))));
 
         // Green crosshair — drag start
         canvas.StrokeColor = Colors.Lime;
@@ -181,7 +178,7 @@ public sealed partial class CoordinatePrompter
         canvas.DrawLine((float)endX - crossLen, (float)endY, (float)endX + crossLen, (float)endY);
         canvas.DrawLine((float)endX, (float)endY - crossLen, (float)endX, (float)endY + crossLen);
 
-        using var ms = new MemoryStream();
+        using MemoryStream ms = new MemoryStream();
         context.WriteToStream(ms);
         return ms.ToArray();
     }
@@ -204,15 +201,15 @@ public sealed partial class CoordinatePrompter
         int w = (int)gridImage.Width;
         int h = (int)gridImage.Height;
 
-        using var context = new SkiaBitmapExportContext(w, h, 1.0f);
+        using SkiaBitmapExportContext context = new SkiaBitmapExportContext(w, h, 1.0f);
         ICanvas canvas = context.Canvas;
 
         canvas.DrawImage(gridImage, 0, 0, w, h);
 
         float cellW = (float)imageWidth / cols;
         float cellH = (float)imageHeight / rows;
-        float cx = rulerOffset + (float)coordinate.X * cellW;
-        float cy = rulerOffset + (float)coordinate.Y * cellH;
+        float cx = rulerOffset + ((float)coordinate.X * cellW);
+        float cy = rulerOffset + ((float)coordinate.Y * cellH);
         float radius = Math.Max(10f, imageWidth / 150f);
         float crossLen = radius * 2.5f;
 
@@ -223,7 +220,7 @@ public sealed partial class CoordinatePrompter
         canvas.DrawLine(cx - crossLen, cy, cx + crossLen, cy);
         canvas.DrawLine(cx, cy - crossLen, cx, cy + crossLen);
 
-        using var ms = new MemoryStream();
+        using MemoryStream ms = new MemoryStream();
         context.WriteToStream(ms);
         return ms.ToArray();
     }
@@ -276,7 +273,7 @@ public sealed partial class CoordinatePrompter
         // Vertical lines + X axis labels
         for (int c = 0; c <= cols; c++)
         {
-            float x = rulerOffset + c * cellW;
+            float x = rulerOffset + (c * cellW);
 
             if (gridLinesOnly && (c == 0 || c == cols))
                 continue;
@@ -296,7 +293,7 @@ public sealed partial class CoordinatePrompter
                 float textW = labelSize * label.Length * 0.75f;
                 float textH = labelSize * 1.3f;
                 canvas.DrawString(label,
-                    x - textW / 2, rulerOffset - tickLen - labelGap - textH, textW, textH,
+                    x - (textW / 2), rulerOffset - tickLen - labelGap - textH, textW, textH,
                     HorizontalAlignment.Center, VerticalAlignment.Center);
 
                 canvas.DrawLine(x, rulerOffset - tickLen, x, rulerOffset);
@@ -306,7 +303,7 @@ public sealed partial class CoordinatePrompter
         // Horizontal lines + Y axis labels
         for (int r = 0; r <= rows; r++)
         {
-            float y = rulerOffset + r * cellH;
+            float y = rulerOffset + (r * cellH);
 
             if (gridLinesOnly && (r == 0 || r == rows))
                 continue;
@@ -326,7 +323,7 @@ public sealed partial class CoordinatePrompter
                 float textW = labelSize * label.Length * 0.75f;
                 float textH = labelSize * 1.3f;
                 canvas.DrawString(label,
-                    rulerOffset - tickLen - labelGap - textW, y - textH / 2, textW, textH,
+                    rulerOffset - tickLen - labelGap - textW, y - (textH / 2), textW, textH,
                     HorizontalAlignment.Right, VerticalAlignment.Center);
 
                 canvas.DrawLine(rulerOffset - tickLen, y, rulerOffset, y);
@@ -464,8 +461,8 @@ public sealed partial class CoordinatePrompter
         double cellPixelH = currentView.Height / rows;
 
         return new ViewRegion(
-            currentView.X + startX * cellPixelW,
-            currentView.Y + startY * cellPixelH,
+            currentView.X + (startX * cellPixelW),
+            currentView.Y + (startY * cellPixelH),
             spanX * cellPixelW,
             spanY * cellPixelH);
     }
@@ -489,8 +486,8 @@ public sealed partial class CoordinatePrompter
         double cellPixelH = currentView.Height / rows;
 
         // Center of the zoom in original image pixel coordinates
-        double centerX = currentView.X + coordinate.X * cellPixelW;
-        double centerY = currentView.Y + coordinate.Y * cellPixelH;
+        double centerX = currentView.X + (coordinate.X * cellPixelW);
+        double centerY = currentView.Y + (coordinate.Y * cellPixelH);
 
         // Square side: ±1 cell buffer using the larger cell dimension,
         // clamped so it never exceeds the source image in either axis.

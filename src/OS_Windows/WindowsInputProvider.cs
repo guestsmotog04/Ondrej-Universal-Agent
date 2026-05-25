@@ -231,7 +231,7 @@ namespace Thio_Universal_Agent.OS_Windows
             if (key != null)
             {
                 // Try named keys first (win, enter, tab, f1, etc.) — TextCharCode only handles single typeable characters
-                if (NamedKeys.TryGetValue(key, out var named))
+                if (NamedKeys.TryGetValue(key, out (ushort vk, bool extended) named))
                 {
                     vk = named.vk;
                     scan = MapVirtualKey((ushort)vk, (uint)MapVirtualKeyType.MAPVK_VK_TO_VSC);
@@ -337,7 +337,7 @@ namespace Thio_Universal_Agent.OS_Windows
             // Convert the string into a list of TextCharCode objects.
             // TextCharCode logic determines if a character is a standard key (needing Shift/VK)
             // or if it should be treated as a Unicode packet.
-            var charCodeList = new List<TextCharCode>();
+            List<TextCharCode> charCodeList = new List<TextCharCode>();
 
             // Iterate over the string. 
             // Note: If you need to handle surrogate pairs (like emojis) that occupy 2 chars,
@@ -506,7 +506,7 @@ namespace Thio_Universal_Agent.OS_Windows
                     this.unicodeArray = null;
                     this.character = characterString[0];
                     this.vk = vkCode;
-                    this.scan = getScanCode((ushort)this.vk);
+                    this.scan = getScanCode(vk);
                     this.unicodeFlag = false;
                     this.shiftState = shift;
                 }
@@ -539,10 +539,7 @@ namespace Thio_Universal_Agent.OS_Windows
                 }
             }
 
-            private static ushort getScanCode(ushort vkCode)
-            {
-                return MapVirtualKey((uint)vkCode, (uint)MapVirtualKeyType.MAPVK_VK_TO_VSC);
-            }
+            private static ushort getScanCode(ushort vkCode) => MapVirtualKey(vkCode, (uint)MapVirtualKeyType.MAPVK_VK_TO_VSC);
 
             private static ushort[] UnicodeToUShortArray(string inputChar)
             {
@@ -615,8 +612,8 @@ namespace Thio_Universal_Agent.OS_Windows
             {
                 inputs[i * 2].type = INPUT_MOUSE;
                 inputs[i * 2].u.mi.dwFlags = downFlag;
-                inputs[i * 2 + 1].type = INPUT_MOUSE;
-                inputs[i * 2 + 1].u.mi.dwFlags = upFlag;
+                inputs[(i * 2) + 1].type = INPUT_MOUSE;
+                inputs[(i * 2) + 1].u.mi.dwFlags = upFlag;
             }
 
             _ = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));

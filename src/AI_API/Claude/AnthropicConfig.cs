@@ -20,5 +20,8 @@ public class AnthropicConfig : IAiProviderConfig
 
     public AnthropicConfig() { }
 
-    public AnthropicConfig(IConfigurationSection section) => ConfigSectionBinder.Bind(this, section);
+    public AnthropicConfig(IConfigurationSection section)
+    {
+        ConfigSectionBinder.Bind(this, section);
+    }
 }

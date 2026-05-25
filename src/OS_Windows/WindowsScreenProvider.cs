@@ -18,18 +18,18 @@ public class WindowsScreenProvider(AppConfig appConfig) : IScreenProvider
 
     public IReadOnlyList<MonitorInfo> GetMonitors()
     {
-        IntPtr previousDpiContext = NativeMethods.SetThreadDpiAwarenessContext((IntPtr)(-4));
+        IntPtr previousDpiContext = NativeMethods.SetThreadDpiAwarenessContext(-4);
         try
         {
-            var monitors = new List<MonitorInfo>();
+            List<MonitorInfo> monitors = new List<MonitorInfo>();
             int index = 0;
 
             NativeMethods.MonitorEnumDelegate callback = (hMonitor, _, _, _) =>
             {
-                var info = new NativeMethods.MONITORINFO { cbSize = (uint)Marshal.SizeOf<NativeMethods.MONITORINFO>() };
+                NativeMethods.MONITORINFO info = new NativeMethods.MONITORINFO { cbSize = (uint)Marshal.SizeOf<NativeMethods.MONITORINFO>() };
                 if (NativeMethods.GetMonitorInfo(hMonitor, ref info))
                 {
-                    var r = info.rcMonitor;
+                    NativeMethods.RECT r = info.rcMonitor;
                     bool isPrimary = (info.dwFlags & NativeMethods.MONITORINFOF_PRIMARY) != 0;
                     monitors.Add(new MonitorInfo(index++, r.left, r.top, r.right - r.left, r.bottom - r.top, isPrimary));
                 }
@@ -74,13 +74,13 @@ public class WindowsScreenProvider(AppConfig appConfig) : IScreenProvider
     public Screenshot CaptureScreen()
     {
         // Temporarily set thread to be DPI aware to get physical pixels instead of scaled logical pixels
-        IntPtr previousDpiContext = NativeMethods.SetThreadDpiAwarenessContext((IntPtr)(-4));
+        IntPtr previousDpiContext = NativeMethods.SetThreadDpiAwarenessContext(-4);
 
         try
         {
             // Single GetCaptureRect call so the screenshot bytes and origin are guaranteed
             // to correspond to the same monitor enumeration result.
-            var (x, y, width, height) = GetCaptureRect();
+            (int x, int y, int width, int height) = GetCaptureRect();
 
             IntPtr hdc = NativeMethods.GetDC(IntPtr.Zero);
             try
@@ -96,7 +96,7 @@ public class WindowsScreenProvider(AppConfig appConfig) : IScreenProvider
                     NativeMethods.BitBlt(destHdc, 0, 0, width, height, hdc, x, y, NativeMethods.SRCCOPY);
 
                     // Draw the cursor on top of the captured image
-                    var cursorInfo = new NativeMethods.CURSORINFO { cbSize = (uint)Marshal.SizeOf<NativeMethods.CURSORINFO>() };
+                    NativeMethods.CURSORINFO cursorInfo = new NativeMethods.CURSORINFO { cbSize = (uint)Marshal.SizeOf<NativeMethods.CURSORINFO>() };
                     if (NativeMethods.GetCursorInfo(ref cursorInfo) &&
                         cursorInfo.flags == NativeMethods.CURSOR_SHOWING &&
                         cursorInfo.hCursor != IntPtr.Zero)
@@ -137,10 +137,10 @@ public class WindowsScreenProvider(AppConfig appConfig) : IScreenProvider
     /// </summary>
     public (int X, int Y) GetVirtualScreenOrigin()
     {
-        IntPtr previousDpiContext = NativeMethods.SetThreadDpiAwarenessContext((IntPtr)(-4));
+        IntPtr previousDpiContext = NativeMethods.SetThreadDpiAwarenessContext(-4);
         try
         {
-            var (x, y, _, _) = GetCaptureRect();
+            (int x, int y, int _, int _) = GetCaptureRect();
             return (x, y);
         }
         finally

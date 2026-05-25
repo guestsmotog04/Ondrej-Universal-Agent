@@ -45,5 +45,8 @@ public class GeminiConfig : IAiProviderConfig
     public GeminiConfig() { }
 
     /// <summary>Creates a <see cref="GeminiConfig"/> loaded from a <c>Gemini</c> configuration section.</summary>
-    public GeminiConfig(IConfigurationSection section) => ConfigSectionBinder.Bind(this, section);
+    public GeminiConfig(IConfigurationSection section)
+    {
+        ConfigSectionBinder.Bind(this, section);
+    }
 }

@@ -1,10 +1,9 @@
 ﻿using System.Globalization;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using Thio_Universal_Agent.AI_API.Anthropic;
 using Thio_Universal_Agent.AI_API.Gemini;
 using Thio_Universal_Agent.AI_API.OpenAI;
-using Thio_Universal_Agent.AI_API.Anthropic;
-using Thio_Universal_Agent;
 
 #pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Thio_Universal_Agent;
@@ -41,29 +40,31 @@ internal static class ConfigSectionBinder
 {
     internal static void Bind(object target, IConfigurationSection section)
     {
-        foreach (var prop in target.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        foreach (PropertyInfo prop in target.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!prop.CanWrite) continue;
 
-            var raw = section[prop.Name];
+            string? raw = section[prop.Name];
             if (raw is null) continue;
 
-            var underlying = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+            Type underlying = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
 
             try
             {
                 if (underlying == typeof(string))
+                {
                     prop.SetValue(target, string.IsNullOrWhiteSpace(raw) ? null : raw);
+                }
                 else if (underlying == typeof(bool))
-                { if (bool.TryParse(raw, out var v)) prop.SetValue(target, v); }
+                { if (bool.TryParse(raw, out bool v)) prop.SetValue(target, v); }
                 else if (underlying == typeof(int))
-                { if (int.TryParse(raw, out var v)) prop.SetValue(target, v); }
+                { if (int.TryParse(raw, out int v)) prop.SetValue(target, v); }
                 else if (underlying == typeof(float))
-                { if (float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var v)) prop.SetValue(target, v); }
+                { if (float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float v)) prop.SetValue(target, v); }
                 else if (underlying == typeof(double))
-                { if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var v)) prop.SetValue(target, v); }
+                { if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double v)) prop.SetValue(target, v); }
                 else if (underlying.IsEnum)
-                { if (Enum.TryParse(underlying, raw, ignoreCase: true, out var v)) prop.SetValue(target, v); }
+                { if (Enum.TryParse(underlying, raw, ignoreCase: true, out object? v)) prop.SetValue(target, v); }
             }
             catch { /* skip individual invalid values */ }
         }
@@ -130,7 +131,10 @@ public class GeneralConfig
     public GeneralConfig() { }
 
     /// <summary>Creates a <see cref="GeneralConfig"/> loaded from a <c>General</c> configuration section.</summary>
-    public GeneralConfig(IConfigurationSection section) => ConfigSectionBinder.Bind(this, section);
+    public GeneralConfig(IConfigurationSection section)
+    {
+        ConfigSectionBinder.Bind(this, section);
+    }
 }
 
 // ── Agent ─────────────────────────────────────────────────────────────────────
@@ -154,7 +158,10 @@ public class AgentConfig
     public AgentConfig() { }
 
     /// <summary>Creates an <see cref="AgentConfig"/> loaded from an <c>Agent</c> configuration section.</summary>
-    public AgentConfig(IConfigurationSection section) => ConfigSectionBinder.Bind(this, section);
+    public AgentConfig(IConfigurationSection section)
+    {
+        ConfigSectionBinder.Bind(this, section);
+    }
 }
 
 // ── Hotkeys ───────────────────────────────────────────────────────────────────
@@ -177,7 +184,10 @@ public class HotkeyConfig
     public HotkeyConfig() { }
 
     /// <summary>Creates a <see cref="HotkeyConfig"/> loaded from a <c>Hotkeys</c> configuration section.</summary>
-    public HotkeyConfig(IConfigurationSection section) => ConfigSectionBinder.Bind(this, section);
+    public HotkeyConfig(IConfigurationSection section)
+    {
+        ConfigSectionBinder.Bind(this, section);
+    }
 }
 
 // ── AppConfig (root) ──────────────────────────────────────────────────────────

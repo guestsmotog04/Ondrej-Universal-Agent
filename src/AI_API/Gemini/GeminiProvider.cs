@@ -366,6 +366,7 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
         }
 
         if (!stripImages && message.ImageBytes is not null)
+        {
             parts.Add(new GeminiPart(
                 Text: null, 
                 InlineData: new GeminiInlineData(
@@ -373,6 +374,7 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
                     Data: Convert.ToBase64String(message.ImageBytes)
                 )
             ));
+        }
 
         return new GeminiContent(
             Role: role,

@@ -75,7 +75,7 @@ public sealed class HotkeyService : IHostedService
 
     private void TryRegister(int id, string hotkeyString)
     {
-        if (!HotkeyStringParser.TryParse(hotkeyString, out var modifiers, out var vk))
+        if (!HotkeyStringParser.TryParse(hotkeyString, out HotkeyModifiers modifiers, out int vk))
         {
             _logger.LogWarning("Could not parse hotkey string \"{Hotkey}\" (id={Id}); skipping.", hotkeyString, id);
             return;
@@ -178,7 +178,7 @@ internal static class HotkeyStringParser
         if (string.IsNullOrWhiteSpace(hotkeyString))
             return false;
 
-        var tokens = hotkeyString.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        string[] tokens = hotkeyString.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         if (tokens.Length == 0)
             return false;
 

@@ -1,9 +1,9 @@
 // Program.cs
 using Microsoft.Extensions.FileProviders;
 using Thio_Universal_Agent;
+using Thio_Universal_Agent.AI_API.Anthropic;
 using Thio_Universal_Agent.AI_API.Gemini;
 using Thio_Universal_Agent.AI_API.OpenAI;
-using Thio_Universal_Agent.AI_API.Anthropic;
 using Thio_Universal_Agent.Endpoints;
 using Thio_Universal_Agent.Handlers;
 using Thio_Universal_Agent.OS_Windows;
@@ -45,7 +45,7 @@ builder.Services.AddHttpClient<AnthropicProvider>();
 // Dynamic factory to resolve the active provider at runtime
 builder.Services.AddTransient<IAiProvider>(sp =>
 {
-    var config = sp.GetRequiredService<AppConfig>();
+    AppConfig config = sp.GetRequiredService<AppConfig>();
     return config.General.ActiveProvider switch
     {
         AiProviderType.ChatGPT => sp.GetRequiredService<OpenAIProvider>(),
@@ -59,11 +59,11 @@ builder.Services.AddTransient<AgentActionExecutor>();
 builder.Services.AddTransient<AgentLoop>();
 builder.Services.AddSingleton<AgentSessionManager>();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 AgentPromptBuilder.SystemProvider = app.Services.GetService<ISystemProvider>();
 
-var embeddedProvider = new EmbeddedFileProvider(typeof(Program).Assembly, "Thio_Universal_Agent.wwwroot");
+EmbeddedFileProvider embeddedProvider = new EmbeddedFileProvider(typeof(Program).Assembly, "Thio_Universal_Agent.wwwroot");
 app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = embeddedProvider });
 app.UseStaticFiles(new StaticFileOptions { FileProvider = embeddedProvider });
 
