@@ -57,43 +57,43 @@ Example of it queuing multiple actions at once, while accurately identifying exa
   <tbody>
     <tr>
       <td align="left"><strong>Ready-to-Run App</strong></td>
-      <td align="center">✔️ <strong>Ready Out of the Box</strong></td>
-      <td align="center">✔️ <strong>N/A<br/><sub>(Web Hosted)</sub></strong></td>
-      <td align="center">❌ <strong>Dev API,<br/>Not an app<sup>4</sup></strong></td>
-      <td align="center">❌ <strong>Dev API,<br/>Not an app<sup>5</sup></strong></td>
-      <td align="center">❌ <strong>Research Framework Only</strong></td>
+      <td align="center"><img src=".github/assets/check-green.svg" width="16"><br/><strong>Ready Out of the Box</strong></td>
+      <td align="center"><img src=".github/assets/check-green.svg" width="16"><br/><strong>N/A<br/><sub>(Web Hosted)</sub></strong></td>
+      <td align="center"><img src=".github/assets/x-red.svg" width="16"><br/><strong>Dev API,<br/>Not an app<sup>4</sup></strong></td>
+      <td align="center"><img src=".github/assets/x-red.svg" width="16"><br/><strong>Dev API,<br/>Not an app<sup>5</sup></strong></td>
+      <td align="center"><img src=".github/assets/x-red.svg" width="16"><br/><strong>Research Framework</strong></td>
     </tr>
     <tr>
       <td align="left"><strong>Setup Difficulty</strong></td>
-      <td align="center">✔️ <strong>Easy</strong><br><sub>(Just launch the portable <code>.exe</code>)</sub></td>
-      <td align="center">✔️ <strong>Easy</strong><br><sub>(Log into web service)</sub></td>
-      <td align="center">❌ <strong>Hard</strong><br><sub>(Requires Python, Playwright)</sub><sup>7</sup></td>
-      <td align="center">❌ <strong>Hard</strong><br><sub>(Requires custom tooling)</sub><sup>8</sup></td>
-      <td align="center">❌ <strong>Hard</strong><br><sub>(Conda, pip installs, YAML configuration)</sub><sup>9</sup></td>
+      <td align="center"><img src=".github/assets/check-green.svg" width="16"><br/><strong>Easy</strong><br/><sub>(Just launch the portable <code>.exe</code>)</sub></td>
+      <td align="center"><img src=".github/assets/check-green.svg" width="16"><br/><strong>Easy</strong><br/><sub>(Log into web service)</sub></td>
+      <td align="center"><img src=".github/assets/x-red.svg" width="16"><br/><strong>Hard</strong><br/><sub>(Requires Python, Playwright)</sub><sup>7</sup></td>
+      <td align="center"><img src=".github/assets/x-red.svg" width="16"><br/><strong>Hard</strong><br/><sub>(Requires custom tooling)</sub><sup>8</sup></td>
+      <td align="center"><img src=".github/assets/x-red.svg" width="16"><br/><strong>Hard</strong><br/><sub>(Conda, pip installs, YAML configuration)</sub><sup>9</sup></td>
     </tr>
     <tr>
       <td align="left"><strong>Computer-Wide Control</strong></td>
-      <td align="center">✔️ <strong>Yes</strong></td>
-      <td align="center">❌ <strong>No</strong><br><sub>(Web-Only)</sub><sup>10</sup></td>
-      <td align="center">❌ <strong>No</strong><br><sub>(Web-Only)</sub><sup>1</sup></td>
-      <td align="center">⚠️ <strong>Not out of the box</strong><br><sub>(Assumes external app to handle input)</sub></td>
-      <td align="center">✔️ <strong>Yes</strong></td>
+      <td align="center"><img src=".github/assets/check-green.svg" width="16"><br/><strong>Yes</strong></td>
+      <td align="center"><img src=".github/assets/x-red.svg" width="16"><br/><strong>No</strong><br><sub>(Web-Only)</sub><sup>10</sup></td>
+      <td align="center"><img src=".github/assets/x-red.svg" width="16"><br/><strong>No</strong><br><sub>(Web-Only)</sub><sup>1</sup></td>
+      <td align="center"><img src=".github/assets/dash-orange.svg" width="16"><br/><strong>Not out of the box</strong><br><sub>(Assumes external app to handle input)</sub></td>
+      <td align="center"><img src=".github/assets/check-green.svg" width="16"><br/><strong>Yes</strong></td>
     </tr>
     <tr>
       <td align="left"><strong>Recommended / Max Resolution</strong></td>
-      <td align="center">✔️<strong>4K+</strong><br><sub>(Depends on chosen model)</sub></td>
-      <td align="center">⚠️<br/><strong>1600x900</strong><br><sub>(Recommended Resolution)</sub><sup>6</sup></td>
-      <td align="center">⚠️<br/><strong>1440x900</strong><br><sub>(Recommended Resolution)</sub><sup>2</sup></td>
-      <td align="center">⚠️<br/><strong>~2560x1440</strong><br><sub>(Max For Opus 4.7)</sub><sup>3</sup></td>
-      <td align="center">✔️<strong>Theoretically Any Resolution</strong><br><sub>(Hybrid UI Automation + Vision)</sub></td>
+      <td align="center"><img src=".github/assets/check-green.svg" width="16"><br/><strong>4K+</strong><br><sub>(Depends on chosen model)</sub></td>
+      <td align="center"><img src=".github/assets/dash-orange.svg" width="16"><br/><strong>1600x900</strong><br><sub>(Recommended Resolution)</sub><sup>6</sup></td>
+      <td align="center"><img src=".github/assets/dash-orange.svg" width="16"><br/><strong>1440x900</strong><br><sub>(Recommended Resolution)</sub><sup>2</sup></td>
+      <td align="center"><img src=".github/assets/dash-orange.svg" width="16"><br/><strong>~2560x1440</strong><br><sub>(Max For Opus 4.7)</sub><sup>3</sup></td>
+      <td align="center"><img src=".github/assets/check-green.svg" width="16"> <strong>Theoretically Any Resolution</strong><br><sub>(Hybrid UI Automation + Vision)</sub></td>
     </tr>
     <tr>
       <td align="left"><strong>Supported Models</strong></td>
-      <td align="center">✔️<strong>Multiple</strong><br><sub>(Gemini, OpenAI, Claude)</sub></td>
-      <td align="center">❌<strong>OpenAI Only</strong></td>
-      <td align="center">❌<strong>Gemini Only</strong></td>
-      <td align="center">❌<strong>Claude Only</strong></td>
-      <td align="center">✔️<strong>Multiple</strong><br><sub>(Gemini, OpenAI, Claude)</sub></td>
+      <td align="center"><img src=".github/assets/check-green.svg" width="16"><br/><strong>Multiple</strong><br><sub>(Gemini, OpenAI, Claude)</sub></td>
+      <td align="center"><img src=".github/assets/x-red.svg" width="16"><br/><strong>OpenAI Only</strong></td>
+      <td align="center"><img src=".github/assets/x-red.svg" width="16"><br/><strong>Gemini Only</strong></td>
+      <td align="center"><img src=".github/assets/x-red.svg" width="16"><br/><strong>Claude Only</strong></td>
+      <td align="center"><img src=".github/assets/check-green.svg" width="16"><br/><strong>Multiple</strong><br><sub>(Gemini, OpenAI, Claude)</sub></td>
     </tr>
   </tbody>
 </table>
