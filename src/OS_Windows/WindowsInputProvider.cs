@@ -248,7 +248,7 @@ namespace Thio_Universal_Agent.OS_Windows
                 }
             }
             // Ensure something is pressed or just skip. Should have already been caught but we'll return early to avoid an unnecessary API call
-            else if (key == null && ctrl == false || shift == false || alt == false || win == false)
+            else if (key == null && ctrl == false && shift == false && alt == false && win == false)
             {
                 return;
             }
