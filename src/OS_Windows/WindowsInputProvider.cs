@@ -5,6 +5,15 @@ namespace Thio_Universal_Agent.OS_Windows
 {
     public partial class WindowsInputProvider : IInputProvider
     {
+        private readonly AppConfig _appConfig;
+        private readonly IScreenProvider _screenProvider;
+
+        public WindowsInputProvider(AppConfig appConfig, IScreenProvider screenProvider)
+        {
+            _appConfig = appConfig;
+            _screenProvider = screenProvider;
+        }
+
         #region PInvoke Definitions
 
         [DllImport("user32.dll", SetLastError = true), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
@@ -562,6 +571,11 @@ namespace Thio_Universal_Agent.OS_Windows
 
         public async Task LeftClick_MonitorCoords(int x, int y)
         {
+            if (_appConfig.General.ShowClickMarkersDuration > 0)
+            {
+                _screenProvider.DrawClickPoint(x, y, _appConfig.General.ShowClickMarkersDuration);
+            }
+
             IntPtr originalContext = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
             SendMouseMove(x, y);
             SetThreadDpiAwarenessContext(originalContext);
@@ -573,6 +587,11 @@ namespace Thio_Universal_Agent.OS_Windows
 
         public async Task DoubleClick_MonitorCoords(int x, int y)
         {
+            if (_appConfig.General.ShowClickMarkersDuration > 0)
+            {
+                _screenProvider.DrawClickPoint(x, y, _appConfig.General.ShowClickMarkersDuration);
+            }
+
             IntPtr originalContext = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
             SendMouseMove(x, y);
             SetThreadDpiAwarenessContext(originalContext);
@@ -584,6 +603,11 @@ namespace Thio_Universal_Agent.OS_Windows
 
         public async Task RightClick_MonitorCoords(int x, int y)
         {
+            if (_appConfig.General.ShowClickMarkersDuration > 0)
+            {
+                _screenProvider.DrawClickPoint(x, y, _appConfig.General.ShowClickMarkersDuration);
+            }
+
             IntPtr originalContext = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
             SendMouseMove(x, y);
             SetThreadDpiAwarenessContext(originalContext);
@@ -595,6 +619,11 @@ namespace Thio_Universal_Agent.OS_Windows
 
         public async Task MiddleMouse_MonitorCoords(int x, int y)
         {
+            if (_appConfig.General.ShowClickMarkersDuration > 0)
+            {
+                _screenProvider.DrawClickPoint(x, y, _appConfig.General.ShowClickMarkersDuration);
+            }
+
             IntPtr originalContext = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
             SendMouseMove(x, y);
             SetThreadDpiAwarenessContext(originalContext);

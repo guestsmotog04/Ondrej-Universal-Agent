@@ -148,6 +148,166 @@ public class WindowsScreenProvider(AppConfig appConfig) : IScreenProvider
             NativeMethods.SetThreadDpiAwarenessContext(previousDpiContext);
         }
     }
+
+
+    private readonly MarkerWindow _markerWindow = new MarkerWindow();
+    private int _currentDrawId;
+
+    public bool DrawClickPoint(int x, int y, int durationMs, int markerOpacity = 255)
+    {
+        // Increment ID to track the latest draw request
+        int drawId = Interlocked.Increment(ref _currentDrawId);
+
+        // Tell the window thread to move and show itself
+        _markerWindow.Show(x, y, markerOpacity);
+
+        // Auto-hide after the duration expires, unless a new draw request was made
+        if (durationMs > 0)
+        {
+            Task.Run(async () =>
+            {
+                await Task.Delay(durationMs);
+                if (_currentDrawId == drawId)
+                    _markerWindow.Hide();
+            });
+        }
+        return true;
+    }
+
+    public bool ClearClickPoints()
+    {
+        Interlocked.Increment(ref _currentDrawId); // Cancel any pending auto-hides
+        _markerWindow.Hide();
+        return true;
+    }
+
+    private class MarkerWindow : IDisposable
+    {
+        private IntPtr _hwnd;
+        private IntPtr _magentaBrush;
+        private readonly Thread _messageThread;
+        private readonly ManualResetEventSlim _ready = new(false);
+        private readonly NativeMethods.WndProcDelegate _wndProcDelegate;
+
+        private readonly object _stateLock = new();
+        private int _x, _y, _opacity;
+
+        public MarkerWindow()
+        {
+            _wndProcDelegate = WndProc;
+            _messageThread = new Thread(MessagePump) { IsBackground = true, Name = "MarkerWindowPump" };
+            _messageThread.SetApartmentState(ApartmentState.STA);
+            _messageThread.Start();
+            _ready.Wait(); // Block until the HWND is created
+        }
+
+        public void Show(int x, int y, int opacity)
+        {
+            lock (_stateLock)
+            {
+                _x = x; _y = y; _opacity = opacity;
+            }
+            NativeMethods.PostMessage(_hwnd, NativeMethods.WM_APP_SHOW, IntPtr.Zero, IntPtr.Zero);
+        }
+
+        public void Hide()
+        {
+            NativeMethods.PostMessage(_hwnd, NativeMethods.WM_APP_HIDE, IntPtr.Zero, IntPtr.Zero);
+        }
+
+        private void MessagePump()
+        {
+            // CRITICAL: Make this thread Per-Monitor DPI Aware V2 so SetWindowPos uses raw physical pixels
+            NativeMethods.SetThreadDpiAwarenessContext(new IntPtr(-4));
+
+            // Use Magenta as the background brush so we can Color-Key it out to be perfectly transparent
+            _magentaBrush = NativeMethods.CreateSolidBrush(0x00FF00FF);
+
+            NativeMethods.WNDCLASSEX wc = new NativeMethods.WNDCLASSEX
+            {
+                cbSize = (uint)Marshal.SizeOf<NativeMethods.WNDCLASSEX>(),
+                lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate),
+                lpszClassName = "TUA_MarkerWindow",
+                hbrBackground = _magentaBrush
+            };
+            NativeMethods.RegisterClassExW(ref wc);
+
+            // Layered = transparency. Transparent = mouse clicks pass right through it. Topmost = stays on top.
+            uint dwExStyle = NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TRANSPARENT | NativeMethods.WS_EX_TOPMOST | NativeMethods.WS_EX_TOOLWINDOW;
+
+            _hwnd = NativeMethods.CreateWindowExW(
+                dwExStyle, "TUA_MarkerWindow", "TUA Marker", NativeMethods.WS_POPUP,
+                0, 0, 60, 60, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+
+            _ready.Set();
+
+            while (NativeMethods.GetMessage(out NativeMethods.MSG msg, IntPtr.Zero, 0, 0) > 0)
+            {
+                NativeMethods.TranslateMessage(ref msg);
+                NativeMethods.DispatchMessageW(ref msg);
+            }
+
+            NativeMethods.DestroyWindow(_hwnd);
+            NativeMethods.DeleteObject(_magentaBrush);
+        }
+
+        private IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
+        {
+            switch (msg)
+            {
+                case NativeMethods.WM_APP_SHOW:
+                    int x, y, op;
+                    lock (_stateLock) { x = _x; y = _y; op = _opacity; }
+
+                    // Make magenta fully transparent, and apply the master opacity to the red drawings
+                    NativeMethods.SetLayeredWindowAttributes(hWnd, 0x00FF00FF, (byte)op, NativeMethods.LWA_COLORKEY | NativeMethods.LWA_ALPHA);
+
+                    // Move the 60x60 window so its center (30,30) is exactly over the target coordinates
+                    NativeMethods.SetWindowPos(hWnd, NativeMethods.HWND_TOPMOST, x - 30, y - 30, 60, 60, NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
+
+                    // Force a repaint in case it was already visible
+                    NativeMethods.InvalidateRect(hWnd, IntPtr.Zero, true);
+                    return IntPtr.Zero;
+
+                case NativeMethods.WM_APP_HIDE:
+                    NativeMethods.ShowWindow(hWnd, NativeMethods.SW_HIDE);
+                    return IntPtr.Zero;
+
+                case NativeMethods.WM_PAINT:
+                    IntPtr hdc = NativeMethods.BeginPaint(hWnd, out NativeMethods.PAINTSTRUCT ps);
+
+                    using (Graphics g = Graphics.FromHdc(hdc))
+                    using (Pen pen = new Pen(Color.Red, 4))
+                    {
+                        // Draw at the center of our 60x60 window (30, 30)
+                        g.DrawEllipse(pen, 15, 15, 30, 30); // Radius 15
+                        g.DrawLine(pen, 8, 30, 52, 30);     // Horizontal crosshair
+                        g.DrawLine(pen, 30, 8, 30, 52);     // Vertical crosshair
+                    }
+
+                    NativeMethods.EndPaint(hWnd, ref ps);
+                    return IntPtr.Zero;
+
+                case NativeMethods.WM_CLOSE:
+                    NativeMethods.PostMessage(hWnd, 0x0012 /* WM_QUIT */, IntPtr.Zero, IntPtr.Zero);
+                    return IntPtr.Zero;
+            }
+            return NativeMethods.DefWindowProcW(hWnd, msg, wParam, lParam);
+        }
+
+        public void Dispose()
+        {
+            if (_hwnd != IntPtr.Zero)
+            {
+                NativeMethods.PostMessage(_hwnd, NativeMethods.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                _messageThread.Join(2000);
+                _hwnd = IntPtr.Zero;
+            }
+            _ready.Dispose();
+        }
+    }
+
+
 }
 
 internal static class NativeMethods
@@ -175,6 +335,7 @@ internal static class NativeMethods
         public RECT rcWork;
         public uint dwFlags;
     }
+
 
     [DllImport("user32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
@@ -228,4 +389,116 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool DrawIconEx(IntPtr hdc, int xLeft, int yTop, IntPtr hIcon,
         int cxWidth, int cyWidth, uint istepIfAniCur, IntPtr hbrFlickerFreeDraw, uint diFlags);
+
+    // ---- Click Marker Related -----
+
+    public const uint WM_PAINT = 0x000F;
+    public const uint WM_CLOSE = 0x0010;
+    public const uint WM_APP_SHOW = 0x8001;
+    public const uint WM_APP_HIDE = 0x8002;
+
+    public const uint WS_POPUP = 0x80000000;
+    public const uint WS_EX_TOPMOST = 0x00000008;
+    public const uint WS_EX_TRANSPARENT = 0x00000020;
+    public const uint WS_EX_TOOLWINDOW = 0x00000080;
+    public const uint WS_EX_LAYERED = 0x00080000;
+
+    public const uint LWA_COLORKEY = 0x00000001;
+    public const uint LWA_ALPHA = 0x00000002;
+
+    public const int SW_HIDE = 0;
+    public const uint SWP_NOACTIVATE = 0x0010;
+    public const uint SWP_SHOWWINDOW = 0x0040;
+
+    public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+
+    public delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PAINTSTRUCT
+    {
+        public IntPtr hdc;
+        public bool fErase;
+        public RECT rcPaint;
+        public bool fRestore;
+        public bool fIncUpdate;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
+        public byte[] rgbReserved;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct WNDCLASSEX
+    {
+        public uint cbSize;
+        public uint style;
+        public IntPtr lpfnWndProc;
+        public int cbClsExtra;
+        public int cbWndExtra;
+        public IntPtr hInstance;
+        public IntPtr hIcon;
+        public IntPtr hCursor;
+        public IntPtr hbrBackground;
+        public string? lpszMenuName;
+        public string lpszClassName;
+        public IntPtr hIconSm;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MSG
+    {
+        public IntPtr hwnd;
+        public uint message;
+        public IntPtr wParam;
+        public IntPtr lParam;
+        public uint time;
+        public POINT pt;
+    }
+
+    [DllImport("user32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern IntPtr BeginPaint(IntPtr hwnd, out PAINTSTRUCT lpPaint);
+
+    [DllImport("user32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern bool EndPaint(IntPtr hWnd, ref PAINTSTRUCT lpPaint);
+
+    [DllImport("user32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+
+    [DllImport("gdi32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern IntPtr CreateSolidBrush(uint crColor);
+
+    [DllImport("gdi32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern bool DeleteObject(IntPtr hObject);
+
+    [DllImport("user32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern IntPtr CreateWindowExW(uint dwExStyle, string lpClassName, string lpWindowName, uint dwStyle, int x, int y, int nWidth, int nHeight, IntPtr hWndParent, IntPtr hMenu, IntPtr hInstance, IntPtr lpParam);
+
+    [DllImport("user32.dll", SetLastError = true), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern bool DestroyWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern IntPtr DefWindowProcW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern ushort RegisterClassExW(ref WNDCLASSEX lpwcx);
+
+    [DllImport("user32.dll", SetLastError = true), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern int GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+
+    [DllImport("user32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern bool TranslateMessage(ref MSG lpMsg);
+
+    [DllImport("user32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern IntPtr DispatchMessageW(ref MSG lpMsg);
+
+    [DllImport("user32.dll", SetLastError = true), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll"), DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static extern bool InvalidateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);
 }

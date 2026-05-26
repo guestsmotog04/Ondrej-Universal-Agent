@@ -120,6 +120,9 @@ public class GeneralConfig
     [ConfigField("Draw Grid Overlay on Screenshots", Description = "Overlay a grid onto screenshots before sending to the AI. May help with accuracy for some models, others not.")]
     public bool AddGridOverlay { get; set; } = false;
 
+    [ConfigField("Click Marker Duration (ms)", Description = "Overlay crosshair on click locations to easily see click actions, for this many milliseconds. 0 Disables.")]
+    public int ShowClickMarkersDuration { get; set; } = 1000;
+
     [ConfigField("System Prompt Template",
         Description = "The full instruction prompt sent to the AI at the start of every session. Use {systemInfo}, {goal}, {maxQueueSize}, and {normalizeSize} as placeholders (including the brackets) — do not rename or remove them.",
         IsPromptTemplate = true)]

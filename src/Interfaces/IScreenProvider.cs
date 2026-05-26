@@ -46,11 +46,10 @@ public interface IScreenProvider
     /// </summary>
     /// <param name="x">The x-coordinate of the click point.</param>
     /// <param name="y">The y-coordinate of the click point.</param>
-    /// <param name="markerImage">The image bytes to use as the click marker.</param>
     /// <param name="durationMs">The duration in milliseconds for which the click point should be displayed. Default is 1000ms. 0 for until cleared manually.</param>
     /// <param name="markerOpacity">The opacity of the click marker, from 0 (fully transparent) to 255 (fully opaque). Default is 255.</param>
     /// <returns>true if the point was successfully drawn; otherwise, false.</returns>
-    bool DrawClickPoint(int x, int y, byte[] markerImage, int durationMs=1000, int markerOpacity=255);
+    bool DrawClickPoint(int x, int y, int durationMs, int markerOpacity=255);
 
     /// <summary>
     /// Clears all drawn click points.
