@@ -9,6 +9,8 @@ using Thio_Universal_Agent.Handlers;
 using Thio_Universal_Agent.OS_Windows;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+int availablePort = PortFinder.StartOnAnyAvailablePort();
+builder.WebHost.UseUrls($"http://localhost:{availablePort}");
 
 // OS Strategy routing
 if (OperatingSystem.IsWindows())
@@ -69,7 +71,8 @@ app.UseStaticFiles(new StaticFileOptions { FileProvider = embeddedProvider });
 
 app.Lifetime.ApplicationStarted.Register(() =>
 {
-    string url = app.Urls.FirstOrDefault() ?? "http://localhost:5112";
+    // Update the fallback URL to use the dynamic port
+    string url = app.Urls.FirstOrDefault() ?? $"http://localhost:{availablePort}";
     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
 });
 
