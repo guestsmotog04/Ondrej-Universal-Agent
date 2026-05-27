@@ -1,5 +1,7 @@
 // Program.cs
 using Microsoft.Extensions.FileProviders;
+using System.Diagnostics;
+using System.IO.Pipes;
 using Thio_Universal_Agent;
 using Thio_Universal_Agent.AI_API.Anthropic;
 using Thio_Universal_Agent.AI_API.Gemini;
@@ -8,9 +10,42 @@ using Thio_Universal_Agent.Endpoints;
 using Thio_Universal_Agent.Handlers;
 using Thio_Universal_Agent.OS_Windows;
 
+// Enforce single instance, open the main instance's URL if already open
+const string appMutexName = "ThioUniversalAgent_SingleInstance_Mutex";
+const string pipeName = "ThioUniversalAgent_URL_Pipe";
+
+// 1. Mutex check to see if we are the second instance
+using Mutex mutex = new Mutex(true, appMutexName, out bool createdNew);
+
+if (!createdNew)
+{
+    // 2. We are the second instance. Connect to the pipe, get the URL, and exit.
+    try
+    {
+        using NamedPipeClientStream client = new NamedPipeClientStream(".", pipeName, PipeDirection.In);
+        client.Connect(2000); // 2-second timeout
+
+        using StreamReader reader = new StreamReader(client);
+        string? existingUrl = reader.ReadLine();
+
+        if (!string.IsNullOrWhiteSpace(existingUrl))
+        {
+            Process.Start(new ProcessStartInfo(existingUrl) { UseShellExecute = true });
+        }
+    }
+    catch { /* Pipe was busy or broken, just exit safely */ }
+
+    return; // Exit second instance immediately
+}
+
+// --------------------------------------
+
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-int availablePort = PortFinder.StartOnAnyAvailablePort();
+int availablePort = RuntimeHandlers.FindAvailablePort();
 builder.WebHost.UseUrls($"http://localhost:{availablePort}");
+
+// 3. Register our managed IPC server to run in the background
+builder.Services.AddHostedService(sp => new RuntimeHandlers.SingleInstanceIpcService(availablePort));
 
 // OS Strategy routing
 if (OperatingSystem.IsWindows())
@@ -71,9 +106,8 @@ app.UseStaticFiles(new StaticFileOptions { FileProvider = embeddedProvider });
 
 app.Lifetime.ApplicationStarted.Register(() =>
 {
-    // Update the fallback URL to use the dynamic port
     string url = app.Urls.FirstOrDefault() ?? $"http://localhost:{availablePort}";
-    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
 });
 
 app.MapTestEndpoints();
