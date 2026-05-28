@@ -1,18 +1,18 @@
 <h1 align = 'center'>
     <img 
-        src = '/assets/Icon.png' 
+        src = '.github/assets/Icon.png' 
         height = '100' 
         width = '100' 
-        alt = '' 
+        alt = 'Thio Universal Agent Icon' 
     >
     <br>
     Thio's Universal Agent
     <br>
 </h1>
 
-An AI desktop assistant app capable of interacting with your entire computer and any apps like you do.
+An AI desktop assistant app capable of interacting with your entire computer (and any apps) like you do.
 
-## What It Does (Why "Universal"?)
+## What It Does (And Why "Universal"?)
 
 **Simply put, it works across the whole computer.** Unlike most AI "computer use" tools which only work in a browser or via command line, this uses the computer like you do.
 
