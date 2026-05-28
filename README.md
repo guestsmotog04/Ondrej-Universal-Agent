@@ -21,7 +21,7 @@ It controls Windows purely through visual perception and GUI interaction. By int
 ## Demonstration
 
 <p align="center">
-Example of it queuing multiple actions at once, while accurately identifying exact coordinates.
+Example of it queuing multiple actions at once, while accurately clicking exact coordinates within the <i>entire</i> 4K screen.
 <br/><br/>
 <img width="1000" alt="Demo Gif" src="https://github.com/user-attachments/assets/c3109876-93b3-4ebe-84a5-1598f3b7874d" />
 </p>
@@ -42,7 +42,7 @@ Example of it queuing multiple actions at once, while accurately identifying exa
 # Frequently Asked Questions
 
 ### **Q:** Is this like OpenClaw or Hermes?
-**A:** No, this is not intended to be a 24/7 running agent. It's meant for individual tasks you'd that you'd normally do yourself. Give it a "goal", sit back, and it will start moving the mouse, clicking, typing, etc. just like you would.
+**A:** No, this is not intended to be a 24/7 running agent. It also doesn't rely on CLI/Shell commands. It's meant for individual tasks or problems you'd normally have to do yourself. Give it a "goal", sit back, and it will start moving the mouse, clicking, typing, etc. just like you would.
 
 ### **Q:** How long _can_ it run?
 **A:** There's not actually a limit. You can set the max number of steps to any number in the settings. The default is arbitrarily set to 100 steps.
@@ -56,6 +56,9 @@ Example of it queuing multiple actions at once, while accurately identifying exa
   - I recommend setting thinking to the minimum, but even then it may use a few thousand tokens if it's going to queue up a lot of actions.
   - There's also context mitigation logic, such as summarization context every X steps, and removing past images from the context window (Both can be disabled in settings)
 
+### **Q:** Can I do other stuff while it's going?
+**A:** Not really. It won't block your mouse or keyboard input or anything. But it's best to not touch anything while it's running to prevent interfering. You can do little stuff between steps to help it though, like if it clicked the wrong thing, click it yourself.
+  - You can use global keyboard hotkeys to pause or stop it at any time.
 
 --------
 
