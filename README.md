@@ -1,16 +1,24 @@
-# 🤖 Thio's Universal Agent
+<h1 align = 'center'>
+    <img 
+        src = '/assets/Icon.png' 
+        height = '100' 
+        width = '100' 
+        alt = '' 
+    >
+    <br>
+    Thio's Universal Agent
+    <br>
+</h1>
 
-An autonomous AI desktop assistant capable of host-native execution using Vision-Language Models (Gemini, ChatGPT, Claude).
+An AI desktop assistant app capable of interacting with your entire computer and any apps like you do.
 
-## How It Works (Why "Universal"?)
+## What It Does (Why "Universal"?)
 
 **Simply put, it works across the whole computer.** Unlike most AI "computer use" tools which only work in a browser or via command line, this uses the computer like you do.
 
-It controls Windows purely through visual perception and GUI interaction. By interpreting raw pixels and sending hardware-level input (mouse movements, clicks, keystrokes), it operates exactly like a human would. This makes it **universally compatible** with any graphical application on your host machine.
+It controls Windows purely through visual perception and GUI interaction. By interpreting raw pixels and sending hardware-level input (mouse movements, clicks, keystrokes), it operates exactly like a human would. This makes it **universally compatible** with any graphical application on your machine.
 
-It does **not** require UI Automation APIs, screen reader support, or application-specific hooks. 
-
-# Demonstration
+## Demonstration
 
 <p align="center">
 Example of it queuing multiple actions at once, while accurately identifying exact coordinates.
@@ -22,7 +30,7 @@ Example of it queuing multiple actions at once, while accurately identifying exa
 <b>Model:</b> Gemini 3.5 Flash
 </p>
 
-# Example Uses
+# Example Use Cases
 
 - Ask it to _show_ you how to do something instead of just getting a text description like other AIs.
 - Ask it to troubleshoot some error you're getting and figure out the cause.
@@ -31,7 +39,7 @@ Example of it queuing multiple actions at once, while accurately identifying exa
     - (Though not recommended to leave unattended, unless in a controlled sandbox environment)
 
 
-## Frequently Asked Questions
+# Frequently Asked Questions
 
 ### **Q:** Is this like OpenClaw or Hermes?
 **A:** No, this is not intended to be a 24/7 running agent. It's meant for individual tasks you'd that you'd normally do yourself. Give it a "goal", sit back, and it will start moving the mouse, clicking, typing, etc. just like you would.
@@ -143,7 +151,7 @@ Example of it queuing multiple actions at once, while accurately identifying exa
 # How it Works
 
 ### The Observe-Think-Act Loop:
-1. **Observe:** Captures the current desktop state as an image.
+1. **Observe:** Captures the current desktop state as an image. It does **not** require UI Automation APIs, screen reader support, or application-specific hooks.
 2. **Think:** Sends the screenshot and prompt to the AI to determine the next action.
 3. **Use Input Tools:** The AI chooses the desired tool (e.g., `LEFT_CLICK`, `TYPE_TEXT`) and outputs the coordinates. Through some clever prompting tricks, this is highly reliable and accurate even with high resolution (4K) screenshots
 4. **Act:** Simulates physical hardware inputs via native OS APIs (`user32.dll` / `gdi32.dll`).
@@ -152,14 +160,22 @@ Example of it queuing multiple actions at once, while accurately identifying exa
 - **Queued actions** - The AI can queue multiple actions where appropriate to speed through multiple similar actions, such as drawing quickly.
 - **Accurate Clicking** - Prompts optimized so even on a 4K screen, the latest models can be spot-on with coordinates even for small UI elements.
 
-### Usage / Security Notice
+### Security Notice
 
 **⚠️ <ins>Prototype software - Not intended for production use.</ins>**<br/>
 This application executes real, unauthenticated OS-level input events. Do not expose the web server port to the internet or untrusted networks. Operate only in a supervised, isolated local environment.
 
-## Usage Instructions
+# Setup & Usage Instructions
 
-1. Run the compiled executable. A local web interface will initialize (default: `http://localhost:5112`).
+### How to Download
+1.  Go to the [Releases](https://github.com/ThioJoe/Thio-Universal-Agent/releases) page.
+2.  For the latest release, look under `Assets` and download `Thio-Universal-Agent.exe`.
+
+### Usage Instructions
+
+Note: You'll need to add your own API key for your AI of choice. I'll add local model support when I get the chance.
+
+1. Run the compiled executable. A local web interface will initialize (default: `http://localhost:51122`).
 2. Navigate to the **Config** menu in the web UI.
 3. Enter your required API key (e.g., Google Gemini) and adjust any desired operational parameters (model, temperature, coordinate mode). Click **Save to browser**.
 4. Navigate to the **Agent Control** panel.
