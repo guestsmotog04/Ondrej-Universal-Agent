@@ -1,6 +1,6 @@
 <h1 align = 'center'>
     <img 
-        src = '.github/assets/Icon.png' 
+        src = './Icon.png' 
         height = '100' 
         width = '100' 
         alt = 'Ondrej Universal Agent Icon' 
