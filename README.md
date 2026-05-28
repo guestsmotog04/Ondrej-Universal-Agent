@@ -3,10 +3,10 @@
         src = '.github/assets/Icon.png' 
         height = '100' 
         width = '100' 
-        alt = 'Thio Universal Agent Icon' 
+        alt = 'Ondrej Universal Agent Icon' 
     >
     <br>
-    Thio's Universal Agent
+    <strike>Thio's</strike> Ondrej's Universal Agent
     <br>
 </h1>
 
