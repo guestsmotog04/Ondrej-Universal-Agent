@@ -50,6 +50,9 @@ public sealed class AgentSession
     /// <summary>Cancellation source that the user or timeout logic can trigger.</summary>
     public CancellationTokenSource Cts { get; } = new();
 
+    /// <summary>Total API tokens consumed across the session.</summary>
+    public int TotalTokensUsed { get; set; } = 0;
+
     // ── Pause / Resume ─────────────────────────────────────────────────────────
 
     private readonly object _pauseLock = new();
@@ -126,28 +129,28 @@ public sealed class AgentSession
 
             await pauseTask.WaitAsync(ct).ConfigureAwait(false);
 
-                _skipCountdown = false;
+            _skipCountdown = false;
 
-                // Count down, but bail out immediately if the user pauses again mid-countdown or skips.
-                bool repaused = false;
-                for (int i = countdownSeconds; i >= 1; i--)
+            // Count down, but bail out immediately if the user pauses again mid-countdown or skips.
+            bool repaused = false;
+            for (int i = countdownSeconds; i >= 1; i--)
+            {
+                if (_skipCountdown) break;
+
+                await RaiseResumeCountdownAsync(i).ConfigureAwait(false);
+                await Task.Delay(1000, ct).ConfigureAwait(false);
+
+                if (_skipCountdown) break;
+
+                lock (_pauseLock)
                 {
-                    if (_skipCountdown) break;
-
-                    await RaiseResumeCountdownAsync(i).ConfigureAwait(false);
-                    await Task.Delay(1000, ct).ConfigureAwait(false);
-
-                    if (_skipCountdown) break;
-
-                    lock (_pauseLock)
+                    if (_pauseTcs is not null)
                     {
-                        if (_pauseTcs is not null)
-                        {
-                            repaused = true;
-                            break;
-                        }
+                        repaused = true;
+                        break;
                     }
                 }
+            }
 
             // Always send 0 to hide the banner, then either loop back to wait or return.
             await RaiseResumeCountdownAsync(0).ConfigureAwait(false);

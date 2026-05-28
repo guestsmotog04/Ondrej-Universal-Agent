@@ -1,10 +1,11 @@
 // @ts-check
 // ── Type definitions ──────────────────────────────────────────────────────
 
+/** @typedef {{ promptTokens: number, completionTokens: number, totalTokens: number }} TokenUsage */
 /** @typedef {{ aiResponseMs: number, parseMs: number, executionMs: number, coordResolutionMs?: number }} StepTimings */
 /** @typedef {{ label: string, text?: string, imageBase64?: string }} DebugLogEntry */
-/** @typedef {{ action: string, result: string, durationMs: number, success: boolean, debugLog?: DebugLogEntry[] }} QueuedSubStep */
-/** @typedef {{ type: 'step', stepNumber: number, thought: string, action: string, result: string, durationMs: number, success: boolean, isTerminal?: boolean, goalAchieved?: boolean, isParseRejected?: boolean, timings?: StepTimings, debugLog?: DebugLogEntry[], queuedSubSteps?: QueuedSubStep[] }} AgentStepMessage */
+/** @typedef {{ action: string, result: string, durationMs: number, success: boolean, debugLog?: DebugLogEntry[], usage?: TokenUsage }} QueuedSubStep */
+/** @typedef {{ type: 'step', stepNumber: number, thought: string, action: string, result: string, durationMs: number, success: boolean, isTerminal?: boolean, goalAchieved?: boolean, isParseRejected?: boolean, timings?: StepTimings, debugLog?: DebugLogEntry[], queuedSubSteps?: QueuedSubStep[], usage?: TokenUsage, totalTokensUsed?: number }} AgentStepMessage */
 /** @typedef {{ type: 'stepStarting', stepNumber: number, thought: string, action: string, queueSize: number }} AgentStepStartingMessage */
 /** @typedef {{ type: 'subStep', label: string, text?: string, imageBase64?: string }} AgentSubStepMessage */
 /** @typedef {{ type: 'countdown', seconds: number }} AgentCountdownMessage */
@@ -13,7 +14,7 @@
 /** @typedef {AgentStepMessage | AgentStepStartingMessage | AgentSubStepMessage | AgentCountdownMessage | AgentGuidanceQueuedMessage | AgentDoneMessage | { type: 'paused' } | { type: 'resumed' }} AgentSseMessage */
 /** @typedef {{ gemini?: { model?: string, apiKey?: string }, [key: string]: (Record<string, unknown> | undefined) }} StoredConfigData */
 /** @typedef {{ index: number, isPrimary: boolean, width: number, height: number }} MonitorInfo */
-/** @typedef {{ goal?: string, status: string, isPaused: boolean, startedAt?: string, totalDurationMs?: number, finalResult?: string }} SessionStatusResponse */
+/** @typedef {{ goal?: string, status: string, isPaused: boolean, startedAt?: string, totalDurationMs?: number, finalResult?: string, totalTokensUsed?: number }} SessionStatusResponse */
 /** @typedef {{ sessionId: string }} StartAgentResponse */
 /** @typedef {{ label: string, text?: string, image?: string }} CopyDebugEntry */
 /** @typedef {{ stepNumber: number, thought: string, action: string, result: string, durationMs: number, timings?: StepTimings, isTerminal?: true, goalAchieved?: boolean, debugLog?: CopyDebugEntry[] }} CopyOutputStep */
@@ -30,6 +31,7 @@ const btnNewSession   = /** @type {HTMLButtonElement} */  (document.getElementBy
 const statusDot       = /** @type {HTMLDivElement} */     (document.getElementById('status-dot'));
 const statusText      = /** @type {HTMLSpanElement} */    (document.getElementById('status-text'));
 const stepCounter     = /** @type {HTMLSpanElement} */    (document.getElementById('step-counter'));
+const tokenCounter    = /** @type {HTMLSpanElement} */    (document.getElementById('token-counter'));
 const finalResultEl   = /** @type {HTMLDivElement} */     (document.getElementById('final-result'));
 const finalResultMsg  = /** @type {HTMLSpanElement} */    (document.getElementById('final-result-msg'));
 const finalResultTime = /** @type {HTMLSpanElement} */    (document.getElementById('final-result-time'));
@@ -177,6 +179,10 @@ let elapsedIntervalId;
                 resetControls();
             }
 
+            if (status.totalTokensUsed != null) {
+                updateTokenCounter(status.totalTokensUsed);
+            }
+
             // Connect SSE: for running sessions this streams live events; for
             // terminated sessions it replays all steps and fires the done event.
             connectStream(storedSid);
@@ -292,6 +298,7 @@ async function startAgent() {
     currentResult.textContent = '';
     liveSubsteps.innerHTML = '';
     stepCounter.textContent = '';
+    updateTokenCounter(0);
     setStatus('running', debugEnabled ? 'Running (Debug Mode)' : 'Running');
 
     btnStart.disabled = true;
@@ -411,6 +418,7 @@ async function newSession() {
     currentResult.textContent = '';
     liveSubsteps.innerHTML = '';
     stepCounter.textContent = '';
+    updateTokenCounter(0);
     goalInput.value = '';
     setStatus('idle', debugEnabled ? 'Idle (Debug Mode)' : 'Idle');
     resetControls();
@@ -576,6 +584,9 @@ function handleSubStep(msg) {
 function handleStep(msg) {
     stepsData.push(msg);
     stepCounter.textContent = `Step ${msg.stepNumber}`;
+    if (msg.totalTokensUsed != null) {
+        updateTokenCounter(msg.totalTokensUsed);
+    }
 
     liveSubsteps.innerHTML = '';
 
@@ -609,6 +620,10 @@ function handleStep(msg) {
             timingsHtml += `<span class="timing-pill timing-coord" title="Coord resolution (subset of Exec)">Coord&nbsp;${formatDuration(t.coordResolutionMs)}</span>`;
         timingsHtml += '</div>';
         html += timingsHtml;
+    }
+
+    if (msg.usage && msg.usage.totalTokens > 0) {
+        html += `<div class="step-tokens" style="font-size:0.85em;color:#888;margin-top:4px;">Tokens: ${msg.usage.totalTokens.toLocaleString()} (${msg.usage.promptTokens.toLocaleString()} prompt, ${msg.usage.completionTokens.toLocaleString()} completion)</div>`;
     }
 
     // Nested expandable queue sub-steps
@@ -655,6 +670,9 @@ function renderQueuedSubSteps(subSteps) {
         html += `<div class="queue-substep-item">`;
         html += `<div class="queue-substep-action">${escapeHtml(s.action)}<span class="step-duration">&nbsp;${formatDuration(s.durationMs)}</span></div>`;
         html += `<div class="queue-substep-result">${ok ? '✓' : '✗'}&nbsp;${escapeHtml(s.result)}</div>`;
+        if (s.usage && s.usage.totalTokens > 0) {
+            html += `<div class="step-tokens" style="font-size:0.8em;color:#777;margin-top:2px;">Tokens: ${s.usage.totalTokens.toLocaleString()}</div>`;
+        }
         if (s.debugLog && debugEnabled) {
             const vis = s.debugLog.filter(e => e.text || e.imageBase64);
             if (vis.length > 0) html += renderDebugLog(vis);
@@ -836,6 +854,22 @@ function resetControls() {
     monitorSelect.disabled = false;
     guidancePanel.style.display = 'none';
     guidanceAck.classList.remove('show');
+}
+
+/**
+ * @param {number} tokens
+ */
+function updateTokenCounter(tokens) {
+    if (!tokenCounter) return;
+    if (tokens > 0) {
+        tokenCounter.textContent = ` | Total Tokens: ${tokens.toLocaleString()}`;
+        tokenCounter.style.marginLeft = '10px';
+        tokenCounter.style.color = '#a0a030';
+        tokenCounter.style.fontFamily = "'Cascadia Code', 'Consolas', monospace";
+        tokenCounter.style.fontWeight = '600';
+    } else {
+        tokenCounter.textContent = '';
+    }
 }
 
 /**

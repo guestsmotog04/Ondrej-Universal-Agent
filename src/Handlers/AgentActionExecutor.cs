@@ -152,7 +152,7 @@ public sealed partial class AgentActionExecutor(
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("OS Input Call", Text: cursorMethodCalled)).ConfigureAwait(false);
 
             string cursorCoordStr = $"({curX.ToString(CultureInfo.InvariantCulture)}, {curY.ToString(CultureInfo.InvariantCulture)})";
-            return new ActionExecutionResult(true, $"{action.Kind} at current cursor position {cursorCoordStr}.", IsTerminal: false, GoalAchieved: false);
+            return new ActionExecutionResult(true, $"{action.Kind} at current cursor position {cursorCoordStr}.", IsTerminal: false, GoalAchieved: false, Usage: new TokenUsage(0, 0, 0));
         }
         // If exact coordinates were supplied directly, parse and dispatch without AI resolution.
         else if (action.AltMode == AgentActionAltMode.ExactCoords)
@@ -213,7 +213,7 @@ public sealed partial class AgentActionExecutor(
 
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("OS Input Call", Text: exactMethodCalled)).ConfigureAwait(false);
 
-            return new ActionExecutionResult(true, $"{action.Kind} at exact coordinates {coord}.", IsTerminal: false, GoalAchieved: false);
+            return new ActionExecutionResult(true, $"{action.Kind} at exact coordinates {coord}.", IsTerminal: false, GoalAchieved: false, Usage: new TokenUsage(0, 0, 0));
         }
         // If we need to resolve the coordinates from natural language description
         else
@@ -249,7 +249,7 @@ public sealed partial class AgentActionExecutor(
             }
 
             Stopwatch coordSw = Stopwatch.StartNew();
-            ScreenCoordinate coord = await coordinatePrompter
+            (ScreenCoordinate coord, TokenUsage usage) = await coordinatePrompter
                 .GetCoordinatesForItemAsync(screenshot, target, onStepCompleted: onCoordStep, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
             coordSw.Stop();
@@ -304,7 +304,7 @@ public sealed partial class AgentActionExecutor(
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("OS Input Call", Text: methodCalled)).ConfigureAwait(false);
 
             string normSuffix = $" (1000x1000 Normalized @ X={coord.NormalizedX:F0}, Y={coord.NormalizedY:F0})";
-            return new ActionExecutionResult(true, $"{action.Kind} at {coord}{normSuffix} targeting \"{target}\".", IsTerminal: false, GoalAchieved: false, CoordResolutionMs: coordSw.ElapsedMilliseconds);
+            return new ActionExecutionResult(true, $"{action.Kind} at {coord}{normSuffix} targeting \"{target}\".", IsTerminal: false, GoalAchieved: false, CoordResolutionMs: coordSw.ElapsedMilliseconds, Usage: usage);
         }
     }
 
@@ -330,6 +330,7 @@ public sealed partial class AgentActionExecutor(
         ScreenCoordinate? startCoordAi = null, endCoordAi = null;
         long startCoordMs = 0, endCoordMs = 0;
         long? totalCoordMs = null;
+        TokenUsage totalUsage = new TokenUsage(0, 0, 0);
 
         if (action.AltMode is AgentActionAltMode.ExactCoords
             or AgentActionAltMode.CurrentCursorPositionStart
@@ -370,10 +371,12 @@ public sealed partial class AgentActionExecutor(
         }
         else
         {
-            (startCoordAi, startCoordMs) = await ResolveTargetCoordinatesAsync(screenshot, source, debugLog, cancellationToken, onProgress)
+            TokenUsage startUsage, endUsage;
+            (startCoordAi, startCoordMs, startUsage) = await ResolveTargetCoordinatesAsync(screenshot, source, debugLog, cancellationToken, onProgress)
                 .ConfigureAwait(false);
             startPx = startCoordAi.AbsoluteX;
             startPy = startCoordAi.AbsoluteY;
+            totalUsage += startUsage;
 
             LogDragSourceCoords(logger, startPx, startPy, source);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Source Coordinates", Text: startCoordAi.ToString())).ConfigureAwait(false);
@@ -382,10 +385,11 @@ public sealed partial class AgentActionExecutor(
             LogResolvingDragDestination(logger, destination);
             await EmitDebugAsync(debugLog, onProgress, new AgentDebugEntry("Drag Destination Resolution", Text: $"Resolving destination: \"{destination}\"")).ConfigureAwait(false);
 
-            (endCoordAi, endCoordMs) = await ResolveTargetCoordinatesAsync(screenshot, destination, debugLog, cancellationToken, onProgress)
+            (endCoordAi, endCoordMs, endUsage) = await ResolveTargetCoordinatesAsync(screenshot, destination, debugLog, cancellationToken, onProgress)
                 .ConfigureAwait(false);
             endPx = endCoordAi.AbsoluteX;
             endPy = endCoordAi.AbsoluteY;
+            totalUsage += endUsage;
 
             totalCoordMs = startCoordMs + endCoordMs;
         }
@@ -417,11 +421,11 @@ public sealed partial class AgentActionExecutor(
 
         string fromStr = $"({startPx.ToString(CultureInfo.InvariantCulture)}, {startPy.ToString(CultureInfo.InvariantCulture)})";
         string toStr = $"({endPx.ToString(CultureInfo.InvariantCulture)}, {endPy.ToString(CultureInfo.InvariantCulture)})";
-        return new ActionExecutionResult(true, $"ClickDrag from {fromStr} to {toStr} (\"{source}\" → \"{destination}\").", IsTerminal: false, GoalAchieved: false, CoordResolutionMs: totalCoordMs);
+        return new ActionExecutionResult(true, $"ClickDrag from {fromStr} to {toStr} (\"{source}\" → \"{destination}\").", IsTerminal: false, GoalAchieved: false, CoordResolutionMs: totalCoordMs, Usage: totalUsage.TotalTokens > 0 ? totalUsage : null);
     }
 
     /// <summary>Resolves a target description to absolute screen coordinates using the coordinate prompter.</summary>
-    private async Task<(ScreenCoordinate coord, long coordMs)> ResolveTargetCoordinatesAsync(
+    private async Task<(ScreenCoordinate coord, long coordMs, TokenUsage usage)> ResolveTargetCoordinatesAsync(
         Screenshot screenshot, string target,
         List<AgentDebugEntry>? debugLog,
         CancellationToken cancellationToken,
@@ -455,12 +459,12 @@ public sealed partial class AgentActionExecutor(
         }
 
         Stopwatch coordSw = Stopwatch.StartNew();
-        ScreenCoordinate coord = await coordinatePrompter
+        (ScreenCoordinate coord, TokenUsage usage) = await coordinatePrompter
             .GetCoordinatesForItemAsync(screenshot, target, onStepCompleted: onCoordStep, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
         coordSw.Stop();
 
-        return (coord, coordSw.ElapsedMilliseconds);
+        return (coord, coordSw.ElapsedMilliseconds, usage);
     }
 
     private async Task<ActionExecutionResult> ExecuteTypeTextAsync(AgentAction action, List<AgentDebugEntry>? debugLog, Func<AgentDebugEntry, Task>? onProgress = null)

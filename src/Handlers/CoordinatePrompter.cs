@@ -123,7 +123,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         double? ParsedY,
         byte[] AnnotatedImage);
 
-    public async Task<(double X, double Y, double? NormX, double? NormY)> GetCoordinatesZoomAsync(
+    public async Task<(double X, double Y, double? NormX, double? NormY, TokenUsage Usage)> GetCoordinatesZoomAsync(
         Screenshot screenshot,
         string itemToIdentify,
         Func<CoordinateStep, Task>? onStepCompleted = null,
@@ -132,6 +132,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
     {
         int divisions = Screenshot.DefaultDivisions; // Maybe later add a config for this, or a way to set the variable
         int stepNumber = 0;
+        TokenUsage totalUsage = new TokenUsage(0, 0, 0);
 
         using Microsoft.Maui.Graphics.Skia.SkiaImage source = LoadImage(screenshot.Processed);
         ViewRegion view = new ViewRegion(source);
@@ -159,6 +160,8 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
                     options: _coordinateRequestOptions)
                 .GetAwaiter().GetResult(); // Using GetAwaiter().GetResult() here to call the async method synchronously within this local function
 
+            if (retryResponse.Usage != null) totalUsage += retryResponse.Usage;
+
             (GridCoordinate? retryCoordinate, ParseFailReason? failReason2, CoordResponseCode responseCode) = ParseCoordinateResponse(retryResponse.Text);
             if (retryCoordinate is null)
             {
@@ -178,6 +181,8 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         AiResponse response = await aiProvider.ContinueConversationAsync(
             conversation, prompt, gridImage, "image/png", cancellationToken, _coordinateRequestOptions)
             .ConfigureAwait(false);
+
+        if (response.Usage != null) totalUsage += response.Usage;
 
         (GridCoordinate? coordinate, ParseFailReason? failReason, CoordResponseCode responseCode) = ParseCoordinateResponse(response.Text);
 
@@ -219,6 +224,8 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
                 conversation, zoomedImage, "image/png", cancellationToken, _coordinateRequestOptions)
                 .ConfigureAwait(false);
 
+            if (response.Usage != null) totalUsage += response.Usage;
+
             stepNumber++;
 
             if (!response.Success)
@@ -258,7 +265,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         }
 
         (double screenX, double screenY) = CalculateScreenCoordinates(view, coordinate, divisions, divisions);
-        return (screenX, screenY, null, null);
+        return (screenX, screenY, null, null, totalUsage);
     }
 
     /// <summary>
@@ -271,7 +278,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
     /// <see cref="CoordinateMode.DirectAutoNormalize"/> sends the raw screenshot in a single prompt with normalized coordinates (default).
     /// Pass <c>null</c> (the default) to use the configured value.
     /// </param>
-    public async Task<ScreenCoordinate> GetCoordinatesForItemAsync(
+    public async Task<(ScreenCoordinate Coordinate, TokenUsage Usage)> GetCoordinatesForItemAsync(
         Screenshot screenshot,
         string itemToIdentify,
         CoordinateMode? mode = null,
@@ -282,40 +289,46 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         ArgumentException.ThrowIfNullOrWhiteSpace(itemToIdentify);
 
         mode ??= _defaultCoordinateMode;
-        (double x, double y, _, _) = mode switch
+        double x, y;
+        double? normX, normY;
+        TokenUsage usage;
+
+        switch (mode)
         {
-            CoordinateMode.Direct => await GetCoordinatesDirectAsync(
-                screenshot, itemToIdentify, onStepCompleted, useNormalization: false,
-                normalizedWidth: null,
-                normalizedHeight: null,
-                cancellationToken: cancellationToken).ConfigureAwait(false),
+            case CoordinateMode.Direct:
+                (x, y, normX, normY, usage) = await GetCoordinatesDirectAsync(
+                    screenshot, itemToIdentify, onStepCompleted, useNormalization: false,
+                    normalizedWidth: null,
+                    normalizedHeight: null,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                break;
+            case CoordinateMode.DirectAutoNormalize:
+                (x, y, normX, normY, usage) = await GetCoordinatesDirectAsync(
+                    screenshot, itemToIdentify, onStepCompleted, useNormalization: true,
+                    normalizedWidth: Screenshot.DefaultNormalized,
+                    normalizedHeight: Screenshot.DefaultNormalized,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                break;
+            case CoordinateMode.Zoom:
+                (x, y, normX, normY, usage) = await GetCoordinatesZoomAsync(
+                    screenshot, itemToIdentify, onStepCompleted, cancellationToken).ConfigureAwait(false);
+                break;
+            default:
+                throw new ArgumentException($"Invalid coordinate mode: {mode}");
+        }
 
-            CoordinateMode.DirectAutoNormalize => await GetCoordinatesDirectAsync(
-                screenshot, itemToIdentify, onStepCompleted, useNormalization: true,
-                normalizedWidth: Screenshot.DefaultNormalized,
-                normalizedHeight: Screenshot.DefaultNormalized
-,
-                cancellationToken: cancellationToken).ConfigureAwait(false),
-
-            CoordinateMode.Zoom => await GetCoordinatesZoomAsync(
-                screenshot, itemToIdentify, onStepCompleted, cancellationToken).ConfigureAwait(false),
-
-            _ => throw new ArgumentException($"Invalid coordinate mode: {mode}")
-        };
-
-        return ScreenCoordinate.FromImagePixels(x, y, screenshot);
+        return (ScreenCoordinate.FromImagePixels(x, y, screenshot), usage);
     }
 
 
     /// <summary> Sends the raw screenshot to the AI in a single request and returns the absolute pixel coordinates reported by the model, with no grid overlay or zoom. </summary>
-    private async Task<(double X, double Y, double? NormX, double? NormY)> GetCoordinatesDirectAsync(
+    private async Task<(double X, double Y, double? NormX, double? NormY, TokenUsage Usage)> GetCoordinatesDirectAsync(
         Screenshot screenshot,
         string itemToIdentify,
         Func<CoordinateStep, Task>? onStepCompleted,
         bool useNormalization,
         int? normalizedWidth,
-        int? normalizedHeight
-,
+        int? normalizedHeight,
         CancellationToken cancellationToken)
     {
         int originalWidth = screenshot.Width;
@@ -338,6 +351,8 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
         AiResponse response = await aiProvider.ContinueConversationAsync(
             conversation, prompt, screenshot.Processed, "image/png", cancellationToken, _coordinateRequestOptions)
             .ConfigureAwait(false);
+
+        TokenUsage usage = response.Usage ?? new TokenUsage(0, 0, 0);
 
         if (!response.Success)
         {
@@ -382,7 +397,7 @@ public sealed partial class CoordinatePrompter(IAiProvider aiProvider, AppConfig
                 .ConfigureAwait(false);
         }
 
-        return (coordinate.X, coordinate.Y, normX, normY);
+        return (coordinate.X, coordinate.Y, normX, normY, usage);
     }
 
     /// <summary>Builds the prompt text for Direct mode (single-shot absolute pixel coordinates).</summary>

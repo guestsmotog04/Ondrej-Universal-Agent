@@ -54,7 +54,7 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
             _model,
             Messages: [
                 new OpenAIMessage(
-                    Role: "user", 
+                    Role: "user",
                     Content: [
                         new OpenAIContentPart(
                             Type: "text",
@@ -69,8 +69,8 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
                         )
                     ]
                 )
-            ], 
-            Temperature: appConfig.OpenAI.Temperature, 
+            ],
+            Temperature: appConfig.OpenAI.Temperature,
             MaxTokens: options?.MaxOutputTokens ?? appConfig.OpenAI.MaxOutputTokens
         );
 
@@ -106,9 +106,9 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
         AiChatMessage userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt };
 
         return ContinueConversationCoreAsync(
-            conversation: conversation, 
-            userMessage: userMessage, 
-            cancellationToken: cancellationToken, 
+            conversation: conversation,
+            userMessage: userMessage,
+            cancellationToken: cancellationToken,
             options: options
         );
     }
@@ -181,7 +181,17 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
         if (string.IsNullOrWhiteSpace(text))
             return new AiResponse(false, string.Empty, "OpenAI returned an empty response.");
 
-        return new AiResponse(true, text);
+        TokenUsage? usage = null;
+        if (openAiResponse?.Usage != null)
+        {
+            usage = new TokenUsage(
+                openAiResponse.Usage.PromptTokens ?? 0,
+                openAiResponse.Usage.CompletionTokens ?? 0,
+                openAiResponse.Usage.TotalTokens ?? 0
+            );
+        }
+
+        return new AiResponse(true, text, Usage: usage);
     }
 
     private OpenAIRequest BuildRequest(AiConversation conversation, AiChatMessage additionalMessage, AiRequestOptions? options)
@@ -195,9 +205,9 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
         messages.Add(ToOpenAIMessage(message: additionalMessage, stripImages: false));
 
         return new OpenAIRequest(
-            Model: _model, 
-            Messages: messages, 
-            Temperature: appConfig.OpenAI.Temperature, 
+            Model: _model,
+            Messages: messages,
+            Temperature: appConfig.OpenAI.Temperature,
             MaxTokens: options?.MaxOutputTokens ?? appConfig.OpenAI.MaxOutputTokens
         );
     }
@@ -213,16 +223,16 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
                 Type: "text",
                 Text: message.Text,
                 ImageUrl: null
-            )); 
+            ));
         }
 
         if (!stripImages && message.ImageBytes is not null)
-        { 
+        {
             content.Add(new OpenAIContentPart(
                 Type: "image_url",
                 Text: null,
                 ImageUrl: new OpenAIImageUrl($"data:{message.MimeType ?? "image/png"};base64,{Convert.ToBase64String(message.ImageBytes)}")
-            )); 
+            ));
         }
 
         return new OpenAIMessage(role, content);
@@ -234,7 +244,8 @@ public sealed class OpenAIProvider(HttpClient httpClient, AppConfig appConfig, I
     private record OpenAIMessage(string Role, List<OpenAIContentPart> Content);
     private record OpenAIContentPart(string Type, string? Text, [property: JsonPropertyName("image_url")] OpenAIImageUrl? ImageUrl);
     private record OpenAIImageUrl([property: JsonPropertyName("url")] string Url);
-    private record OpenAIResponse(List<OpenAIChoice>? Choices, OpenAIError? Error);
+    private record OpenAIUsage([property: JsonPropertyName("prompt_tokens")] int? PromptTokens, [property: JsonPropertyName("completion_tokens")] int? CompletionTokens, [property: JsonPropertyName("total_tokens")] int? TotalTokens);
+    private record OpenAIResponse(List<OpenAIChoice>? Choices, OpenAIError? Error, OpenAIUsage? Usage);
     private record OpenAIChoice(OpenAIMessageResponse? Message, [property: JsonPropertyName("finish_reason")] string? FinishReason);
     private record OpenAIMessageResponse(string? Content);
     private record OpenAIError(string? Message);

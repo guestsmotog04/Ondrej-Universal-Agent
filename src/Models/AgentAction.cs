@@ -118,13 +118,15 @@ public sealed record AgentDebugEntry(string Label, string? Text = null, string? 
 /// <param name="GoalAchieved">True only when the agent declares <see cref="AgentActionKind.Done"/>.</param>
 /// <param name="DebugEntries">Detailed debug entries from execution (only when testing is enabled).</param>
 /// <param name="CoordResolutionMs">Milliseconds spent on AI coordinate resolution, if applicable.</param>
+/// <param name="Usage">Token usage accumulated during this action execution (e.g., coordinate resolution calls).</param>
 public sealed record ActionExecutionResult(
     bool Success,
     string Summary,
     bool IsTerminal,
     bool GoalAchieved,
     IReadOnlyList<AgentDebugEntry>? DebugEntries = null,
-    long? CoordResolutionMs = null);
+    long? CoordResolutionMs = null,
+    TokenUsage? Usage = null);
 
 /// <summary>
 /// Lightweight preview emitted right after the AI's response is parsed but before execution begins.
@@ -166,13 +168,15 @@ public sealed record StepTimings(
 /// <param name="DurationMs">Wall-clock milliseconds spent executing this action.</param>
 /// <param name="DebugLog">Verbose debug entries (only when testing is enabled).</param>
 /// <param name="Timings">Per-phase timing breakdown for this action.</param>
+/// <param name="Usage">Token usage specific to this action execution.</param>
 public sealed record QueuedSubStep(
     int QueueIndex,
     AgentAction Action,
     ActionExecutionResult Result,
     long DurationMs,
     IReadOnlyList<AgentDebugEntry>? DebugLog = null,
-    StepTimings? Timings = null);
+    StepTimings? Timings = null,
+    TokenUsage? Usage = null);
 
 /// <summary>A single completed step in the agent's execution history.</summary>
 /// <param name="StepNumber">1-based index of this step.</param>
@@ -184,6 +188,8 @@ public sealed record QueuedSubStep(
 /// <param name="DebugLog">Verbose debug entries for this step (only when testing is enabled).</param>
 /// <param name="Timings">Per-phase timing breakdown for this step.</param>
 /// <param name="IsParseRejected">True when this step represents a rejected AI response (the AI tried something invalid); rendered with red styling in the UI.</param>
+/// <param name="Usage">Aggregate token usage for this entire step, including parsing, retries, and execution.</param>
+/// <param name="TotalTokensUsed">The running total token count for the entire session at the time this step finished.</param>
 public sealed record AgentStep(
     int StepNumber,
     string Thought,
@@ -194,4 +200,6 @@ public sealed record AgentStep(
     IReadOnlyList<AgentDebugEntry>? DebugLog = null,
     StepTimings? Timings = null,
     IReadOnlyList<QueuedSubStep>? QueuedSubSteps = null,
-    bool IsParseRejected = false);
+    bool IsParseRejected = false,
+    TokenUsage? Usage = null,
+    int TotalTokensUsed = 0);

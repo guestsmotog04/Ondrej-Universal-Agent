@@ -21,4 +21,6 @@ public interface IAiProvider
 
     /// <summary>Continues a conversation with both text and an image follow-up.</summary>
     Task<AiResponse> ContinueConversationAsync(AiConversation conversation, string prompt, byte[] imageBytes, string mimeType = "image/png", CancellationToken cancellationToken = default, AiRequestOptions? options = null);
+
+
 }

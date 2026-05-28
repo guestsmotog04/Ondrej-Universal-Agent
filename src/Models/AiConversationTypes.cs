@@ -13,8 +13,15 @@ public enum AiChatRole
     Model,
 }
 
+/// <summary>Token usage information for an AI API call.</summary>
+public sealed record TokenUsage(int PromptTokens, int CompletionTokens, int TotalTokens)
+{
+    public static TokenUsage operator +(TokenUsage a, TokenUsage b) =>
+        new TokenUsage(a.PromptTokens + b.PromptTokens, a.CompletionTokens + b.CompletionTokens, a.TotalTokens + b.TotalTokens);
+}
+
 /// <summary>Represents the result of an AI prompt call.</summary>
-public record AiResponse(bool Success, string Text, string? ErrorMessage = null);
+public record AiResponse(bool Success, string Text, string? ErrorMessage = null, TokenUsage? Usage = null);
 
 /// <summary>Represents a single message (turn) in an AI conversation.</summary>
 public sealed class AiChatMessage

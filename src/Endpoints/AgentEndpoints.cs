@@ -90,6 +90,7 @@ internal static class AgentEndpoints
                 totalDurationMs = session.CompletedAt.HasValue
                     ? (long)(session.CompletedAt.Value - session.StartedAt).TotalMilliseconds
                     : (long?)null,
+                totalTokensUsed = session.TotalTokensUsed,
             });
         });
 
@@ -109,6 +110,8 @@ internal static class AgentEndpoints
                 s.Result.Success,
                 s.Timestamp,
                 s.DurationMs,
+                s.Usage,
+                s.TotalTokensUsed
             });
 
             return Results.Ok(steps);
@@ -346,6 +349,8 @@ internal static class AgentEndpoints
                 executionMs       = step.Timings.ExecutionMs,
                 coordResolutionMs = step.Timings.CoordResolutionMs,
             },
+            usage = step.Usage,
+            totalTokensUsed = step.TotalTokensUsed,
             debugLog = step.DebugLog?.Select(e => new { e.Label, e.Text, e.ImageBase64 }),
             isParseRejected = step.IsParseRejected,
             queuedSubSteps = step.QueuedSubSteps?.Select(s => new
@@ -362,6 +367,7 @@ internal static class AgentEndpoints
                     executionMs       = s.Timings.ExecutionMs,
                     coordResolutionMs = s.Timings.CoordResolutionMs,
                 },
+                usage = s.Usage,
                 debugLog = s.DebugLog?.Select(e => new { e.Label, e.Text, e.ImageBase64 }),
             }),
         };

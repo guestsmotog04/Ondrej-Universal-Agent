@@ -45,10 +45,10 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
     }
 
     public Task<AiResponse> SendPromptWithImageAsync(
-        string prompt, 
-        byte[] imageBytes, 
+        string prompt,
+        byte[] imageBytes,
         string mimeType = "image/png",
-        CancellationToken cancellationToken = default, 
+        CancellationToken cancellationToken = default,
         AiRequestOptions? options = null
         )
     {
@@ -59,11 +59,11 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
             Model: _model,
             Messages: [
                 new AnthropicMessage(
-                    Role: "user", 
+                    Role: "user",
                     Content: [
                         new AnthropicContentPart(
-                            Type: "image", 
-                            Text: null, 
+                            Type: "image",
+                            Text: null,
                             Source: new AnthropicImageSource(
                                 Type: "base64",
                                 MediaType: mimeType,
@@ -72,13 +72,13 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
                         ),
                         new AnthropicContentPart(
                             Type: "text",
-                            Text: prompt, 
+                            Text: prompt,
                             Source: null
                         )
                     ]
                 )
             ],
-            Temperature: appConfig.Anthropic.Temperature, 
+            Temperature: appConfig.Anthropic.Temperature,
             MaxTokens: options?.MaxOutputTokens ?? appConfig.Anthropic.MaxOutputTokens ?? 4096
         );
 
@@ -86,8 +86,8 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
     }
 
     public async Task<(AiConversation Conversation, AiResponse Response)> StartConversationAsync(
-        string prompt, 
-        CancellationToken cancellationToken = default, 
+        string prompt,
+        CancellationToken cancellationToken = default,
         AiRequestOptions? options = null
         )
     {
@@ -97,8 +97,8 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
         AiChatMessage userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt };
 
         AnthropicRequest request = BuildRequest(
-            conversation: conversation, 
-            additionalMessage: userMessage, 
+            conversation: conversation,
+            additionalMessage: userMessage,
             options: options
         );
 
@@ -114,9 +114,9 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
     }
 
     public Task<AiResponse> ContinueConversationAsync
-        (AiConversation conversation, 
-        string prompt, 
-        CancellationToken cancellationToken = default, 
+        (AiConversation conversation,
+        string prompt,
+        CancellationToken cancellationToken = default,
         AiRequestOptions? options = null
         )
     {
@@ -131,10 +131,10 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
     }
 
     public Task<AiResponse> ContinueConversationAsync(
-        AiConversation conversation, 
-        byte[] imageBytes, 
-        string mimeType = "image/png", 
-        CancellationToken cancellationToken = default, 
+        AiConversation conversation,
+        byte[] imageBytes,
+        string mimeType = "image/png",
+        CancellationToken cancellationToken = default,
         AiRequestOptions? options = null
         )
     {
@@ -148,11 +148,11 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
     }
 
     public Task<AiResponse> ContinueConversationAsync(
-        AiConversation conversation, 
-        string prompt, 
-        byte[] imageBytes, 
-        string mimeType = "image/png", 
-        CancellationToken cancellationToken = default, 
+        AiConversation conversation,
+        string prompt,
+        byte[] imageBytes,
+        string mimeType = "image/png",
+        CancellationToken cancellationToken = default,
         AiRequestOptions? options = null
         )
     {
@@ -166,15 +166,15 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
     }
 
     private async Task<AiResponse> ContinueConversationCoreAsync(
-        AiConversation conversation, 
-        AiChatMessage userMessage, 
-        CancellationToken cancellationToken, 
+        AiConversation conversation,
+        AiChatMessage userMessage,
+        CancellationToken cancellationToken,
         AiRequestOptions? options
         )
     {
         AnthropicRequest request = BuildRequest(
-            conversation: conversation, 
-            additionalMessage: userMessage, 
+            conversation: conversation,
+            additionalMessage: userMessage,
             options: options
         );
 
@@ -234,9 +234,18 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
             );
         }
 
+        TokenUsage? usage = null;
+        if (anthropicResponse?.Usage != null)
+        {
+            int input = anthropicResponse.Usage.InputTokens ?? 0;
+            int output = anthropicResponse.Usage.OutputTokens ?? 0;
+            usage = new TokenUsage(input, output, input + output);
+        }
+
         return new AiResponse(
-            Success: true, 
-            Text: text
+            Success: true,
+            Text: text,
+            Usage: usage
         );
     }
 
@@ -291,7 +300,8 @@ public sealed class AnthropicProvider(HttpClient httpClient, AppConfig appConfig
     private record AnthropicMessage(string Role, List<AnthropicContentPart> Content);
     private record AnthropicContentPart(string Type, string? Text, AnthropicImageSource? Source);
     private record AnthropicImageSource(string Type, [property: JsonPropertyName("media_type")] string MediaType, string Data);
-    private record AnthropicResponse(List<AnthropicContentResponse>? Content, AnthropicError? Error, [property: JsonPropertyName("stop_reason")] string? StopReason);
+    private record AnthropicUsage([property: JsonPropertyName("input_tokens")] int? InputTokens, [property: JsonPropertyName("output_tokens")] int? OutputTokens);
+    private record AnthropicResponse(List<AnthropicContentResponse>? Content, AnthropicError? Error, [property: JsonPropertyName("stop_reason")] string? StopReason, AnthropicUsage? Usage);
     private record AnthropicContentResponse(string Type, string? Text);
     private record AnthropicError(string? Message);
 }

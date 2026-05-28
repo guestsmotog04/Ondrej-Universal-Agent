@@ -205,7 +205,7 @@ internal static class TestEndpoints
 
                 List<object> steps = new List<object>();
 
-                ScreenCoordinate result = await prompter.GetCoordinatesForItemAsync(
+                (ScreenCoordinate result, TokenUsage usage) = await prompter.GetCoordinatesForItemAsync(
                     screenshot,
                     req.ItemToIdentify,
                     mode: coordinateMode,
@@ -224,7 +224,7 @@ internal static class TestEndpoints
                     },
                     cancellationToken: ct);
 
-                return Results.Ok(new { Steps = steps, FinalScreenX = result.AbsoluteX, FinalScreenY = result.AbsoluteY, FinalNormX = result.NormalizedX, FinalNormY = result.NormalizedY });
+                return Results.Ok(new { Steps = steps, FinalScreenX = result.AbsoluteX, FinalScreenY = result.AbsoluteY, FinalNormX = result.NormalizedX, FinalNormY = result.NormalizedY, TokenUsage = usage });
             }
             catch (Exception ex)
             {

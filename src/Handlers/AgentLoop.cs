@@ -61,6 +61,8 @@ public sealed partial class AgentLoop(
                 return;
             }
 
+            TokenUsage carryOverUsage = response.Usage ?? new TokenUsage(0, 0, 0);
+
             // Debug tracking: the prompt/response that produced the AI output we're about to parse
             string lastPromptSent = systemPrompt;
             string lastRawResponse = response.Text;
@@ -74,6 +76,9 @@ public sealed partial class AgentLoop(
             for (int step = 1; step <= _maxSteps; step++)
             {
                 ct.ThrowIfCancellationRequested();
+
+                TokenUsage stepUsage = carryOverUsage;
+                carryOverUsage = new TokenUsage(0, 0, 0);
 
                 bool debugging = appConfig.General.EnableDebugMode;
                 List<AgentDebugEntry>? debugLog = [];
@@ -96,9 +101,10 @@ public sealed partial class AgentLoop(
                 // Parse the AI's response (with retries on malformed output)
                 Stopwatch stepStopwatch = Stopwatch.StartNew();
                 Stopwatch parseSw = Stopwatch.StartNew();
-                (AgentParsedResponse? parsed, List<(string RawText, string Error)>? parseRejections) = await TryParseWithRetriesAsync(
+                (AgentParsedResponse? parsed, List<(string RawText, string Error)>? parseRejections, TokenUsage parseUsage) = await TryParseWithRetriesAsync(
                     conversation, response.Text, ct, debugLog).ConfigureAwait(false);
                 parseSw.Stop();
+                stepUsage += parseUsage;
 
                 // Emit a separate red step entry for each rejected attempt so they're visible in the log.
                 if (parseRejections is not null)
@@ -108,7 +114,7 @@ public sealed partial class AgentLoop(
                         AgentAction rejectedAction = new AgentAction(AgentActionKind.Fail, Reason: rejectionError);
                         ActionExecutionResult rejectedResult = new ActionExecutionResult(false, rejectionError, IsTerminal: false, GoalAchieved: false);
                         AgentStep rejectedStep = new AgentStep(step, rawText, rejectedAction, rejectedResult,
-                            DateTimeOffset.UtcNow, 0, IsParseRejected: true);
+                            DateTimeOffset.UtcNow, 0, IsParseRejected: true, TotalTokensUsed: session.TotalTokensUsed);
                         session.Steps.Add(rejectedStep);
                         await session.RaiseStepCompletedAsync(rejectedStep).ConfigureAwait(false);
                     }
@@ -118,13 +124,14 @@ public sealed partial class AgentLoop(
                 {
                     session.Status = AgentSessionStatus.Failed;
                     session.FinalResult = "Agent produced unparseable responses after retries.";
+                    session.TotalTokensUsed += stepUsage.TotalTokens;
                     LogParseFailures(logger, session.SessionId);
 
                     // Commit a terminal fail step so the UI knows the session ended here.
                     AgentAction failAction = new AgentAction(AgentActionKind.Fail, Reason: "Unparseable AI response");
                     ActionExecutionResult failResult = new ActionExecutionResult(false, "Parse failed after retries.", IsTerminal: true, GoalAchieved: false);
                     AgentStep failStep = new AgentStep(step, "(parse failure)", failAction, failResult, DateTimeOffset.UtcNow, stepStopwatch.ElapsedMilliseconds,
-                        debugLog is { Count: > 0 } ? debugLog : null);
+                        debugLog is { Count: > 0 } ? debugLog : null, Usage: stepUsage, TotalTokensUsed: session.TotalTokensUsed);
                     session.Steps.Add(failStep);
                     await session.RaiseStepCompletedAsync(failStep).ConfigureAwait(false);
                     return;
@@ -134,9 +141,9 @@ public sealed partial class AgentLoop(
                     debugLog!.Add(new AgentDebugEntry("Parse Result", Text: $"Success → {parsed.Action.Kind}: {FormatActionDetail(parsed.Action)}"));
 
                 if (logger.IsEnabled(LogLevel.Information))
-                    #pragma warning disable CA1873 // Avoid potentially expensive logging
+#pragma warning disable CA1873 // Avoid potentially expensive logging
                     LogStepAction(logger, step, parsed.Thought, parsed.Action.Kind, FormatActionDetail(parsed.Action));
-                    #pragma warning restore CA1873 // Avoid potentially expensive logging
+#pragma warning restore CA1873 // Avoid potentially expensive logging
 
                 // Determine the ordered list of actions for this iteration.
                 // QueuedActions is non-null only when the AI used QUEUE: syntax with ≥2 actions.
@@ -161,11 +168,13 @@ public sealed partial class AgentLoop(
                 // execution entirely, emit a cancelled step to the log, then redirect the AI.
                 if (session.ConsumeCancelNextAction())
                 {
+                    session.TotalTokensUsed += stepUsage.TotalTokens;
+
                     ActionExecutionResult cancelledResult = new ActionExecutionResult(false, "Action cancelled by user.", IsTerminal: false, GoalAchieved: false);
                     StepTimings cancelTimings = new StepTimings(lastAiResponseMs, parseSw.ElapsedMilliseconds, 0, null);
                     AgentStep cancelledStep = new AgentStep(step, parsed.Thought, actionsToRun[0], cancelledResult,
                         DateTimeOffset.UtcNow, parseSw.ElapsedMilliseconds,
-                        debugLog is { Count: > 0 } ? debugLog : null, cancelTimings);
+                        debugLog is { Count: > 0 } ? debugLog : null, cancelTimings, null, false, stepUsage, session.TotalTokensUsed);
                     session.Steps.Add(cancelledStep);
                     await session.RaiseStepCompletedAsync(cancelledStep).ConfigureAwait(false);
 
@@ -185,6 +194,8 @@ public sealed partial class AgentLoop(
                         conversation, cancelFeedback, screenshot.Processed, ScreenMimeType, ct).ConfigureAwait(false);
                     cancelAiSw.Stop();
                     lastAiResponseMs = cancelAiSw.ElapsedMilliseconds;
+
+                    if (response.Usage != null) carryOverUsage += response.Usage;
 
                     if (!response.Success)
                     {
@@ -222,9 +233,10 @@ public sealed partial class AgentLoop(
                     List<AgentDebugEntry>? qiDebugLog = qi == 0 ? debugLog : (debugging ? [] : null);
 
                     Stopwatch executeSw = Stopwatch.StartNew();
-                    ActionExecutionResult result = await ExecuteWithTargetRecoveryAsync(
+                    (ActionExecutionResult result, TokenUsage execUsage) = await ExecuteWithTargetRecoveryAsync(
                         currentAction, screenshot, conversation, ct, qiDebugLog, executorProgress).ConfigureAwait(false);
                     executeSw.Stop();
+                    stepUsage += execUsage;
 
                     if (debugging)
                         qiDebugLog!.Add(new AgentDebugEntry("Execution Result", Text: $"Success={result.Success} | {result.Summary}"));
@@ -237,7 +249,7 @@ public sealed partial class AgentLoop(
                             ExecutionMs:       executeSw.ElapsedMilliseconds,
                             CoordResolutionMs: result.CoordResolutionMs);
                         subSteps!.Add(new QueuedSubStep(qi, currentAction, result, executeSw.ElapsedMilliseconds,
-                            qiDebugLog is { Count: > 0 } ? qiDebugLog : null, subTimings));
+                            qiDebugLog is { Count: > 0 } ? qiDebugLog : null, subTimings, execUsage));
                     }
 
                     batchResults.Add(result);
@@ -269,12 +281,17 @@ public sealed partial class AgentLoop(
                     ExecutionMs:       stepStopwatch.ElapsedMilliseconds - parseSw.ElapsedMilliseconds,
                     CoordResolutionMs: isBatch ? null : lastResult.CoordResolutionMs);
 
+                session.TotalTokensUsed += stepUsage.TotalTokens;
+
                 // Emit ONE completed step for the entire batch.
                 AgentStep agentStep = new AgentStep(step, parsed.Thought, actionsToRun[0], lastResult,
                     DateTimeOffset.UtcNow, stepStopwatch.ElapsedMilliseconds,
                     debugLog is { Count: > 0 } ? debugLog : null,
                     stepTimings,
-                    subSteps);
+                    subSteps,
+                    false,
+                    stepUsage,
+                    session.TotalTokensUsed);
                 session.Steps.Add(agentStep);
                 await session.RaiseStepCompletedAsync(agentStep).ConfigureAwait(false);
 
@@ -302,7 +319,9 @@ public sealed partial class AgentLoop(
                 // Episodic context reset to prevent payload bloat
                 if (_enableContextReset && step % _contextResetInterval == 0)
                 {
-                    conversation = await ResetContextAsync(conversation, session.Goal, screenshot, ct, carryOverDebug).ConfigureAwait(false);
+                    TokenUsage resetUsage;
+                    (conversation, resetUsage) = await ResetContextAsync(conversation, session.Goal, screenshot, ct, carryOverDebug).ConfigureAwait(false);
+                    carryOverUsage += resetUsage;
                 }
 
                 // Feed all results + new screenshot back to the AI in a single message.
@@ -320,6 +339,8 @@ public sealed partial class AgentLoop(
                 response = await aiProvider.ContinueConversationAsync(
                     conversation, feedback, screenshot.Processed, ScreenMimeType, ct).ConfigureAwait(false);
                 aiFeedbackSw.Stop();
+
+                if (response.Usage != null) carryOverUsage += response.Usage;
 
                 if (!response.Success)
                 {
@@ -367,16 +388,17 @@ public sealed partial class AgentLoop(
     /// <summary>
     /// Attempts to parse the AI response, sending correction prompts on failure up to <see cref="MaxParseRetries"/> times.
     /// </summary>
-    private async Task<(AgentParsedResponse? Parsed, List<(string RawText, string Error)>? ParseRejections)> TryParseWithRetriesAsync(
+    private async Task<(AgentParsedResponse? Parsed, List<(string RawText, string Error)>? ParseRejections, TokenUsage Usage)> TryParseWithRetriesAsync(
         AiConversation conversation, string responseText, CancellationToken ct,
         List<AgentDebugEntry>? debugLog = null)
     {
         List<(string RawText, string Error)>? parseRejections = null;
+        TokenUsage totalUsage = new TokenUsage(0, 0, 0);
 
         for (int attempt = 0; attempt <= _maxParseRetries; attempt++)
         {
             if (AgentActionParser.TryParse(responseText, appConfig.General.MaxQueueSize, out AgentParsedResponse? parsed, out string? error))
-                return (parsed, parseRejections);
+                return (parsed, parseRejections, totalUsage);
 
             parseRejections ??= [];
             parseRejections.Add((responseText, error));
@@ -395,6 +417,8 @@ public sealed partial class AgentLoop(
                 .ContinueConversationAsync(conversation, correction, ct)
                 .ConfigureAwait(false);
 
+            if (retryResponse.Usage != null) totalUsage += retryResponse.Usage;
+
             if (!retryResponse.Success)
             {
                 LogCorrectionAiFailed(logger, retryResponse.ErrorMessage);
@@ -406,14 +430,14 @@ public sealed partial class AgentLoop(
             responseText = retryResponse.Text;
         }
 
-        return (null, parseRejections);
+        return (null, parseRejections, totalUsage);
     }
 
     /// <summary>
     /// Executes an action.
     /// fails to locate the target, reports the failure back to the AI instead of crashing.
     /// </summary>
-    private async Task<ActionExecutionResult> ExecuteWithTargetRecoveryAsync(
+    private async Task<(ActionExecutionResult Result, TokenUsage Usage)> ExecuteWithTargetRecoveryAsync(
         AgentAction action, Screenshot screenshot,
         AiConversation conversation,
         CancellationToken ct,
@@ -424,6 +448,8 @@ public sealed partial class AgentLoop(
         ActionExecutionResult result = await executor
             .ExecuteAsync(action, screenshot, onProgress, ct)
             .ConfigureAwait(false);
+
+        TokenUsage usage = result.Usage ?? new TokenUsage(0, 0, 0);
 
         // Merge executor's debug entries into our step log
         if (debugLog is not null && result.DebugEntries is { Count: > 0 })
@@ -440,12 +466,13 @@ public sealed partial class AgentLoop(
             if (onProgress is not null) await onProgress(recoveryEntry).ConfigureAwait(false);
 
             AiResponse recoveryResponse = await aiProvider.ContinueConversationAsync(conversation, recovery, ct).ConfigureAwait(false);
+            if (recoveryResponse.Usage != null) usage += recoveryResponse.Usage;
             AgentDebugEntry responseEntry = new AgentDebugEntry("Target Not Found — AI Recovery Response", Text: recoveryResponse.Text);
             debugLog?.Add(responseEntry);
             if (onProgress is not null) await onProgress(responseEntry).ConfigureAwait(false);
         }
 
-        return result;
+        return (result, usage);
     }
 
     /// <summary>
@@ -453,10 +480,11 @@ public sealed partial class AgentLoop(
     /// Asks the AI to summarize progress, then starts a fresh conversation
     /// with the summary and the latest screenshot.
     /// </summary>
-    private async Task<AiConversation> ResetContextAsync(
+    private async Task<(AiConversation Conversation, TokenUsage Usage)> ResetContextAsync(
         AiConversation oldConversation, string goal, Screenshot latestScreenshot, CancellationToken ct,
         List<AgentDebugEntry>? debugLog = null)
     {
+        TokenUsage usage = new TokenUsage(0, 0, 0);
         LogContextReset(logger);
         debugLog?.Add(new AgentDebugEntry("Context Reset", Text: "Initiating episodic context reset to reduce token usage."));
 
@@ -467,6 +495,8 @@ public sealed partial class AgentLoop(
         AiResponse summaryResponse = await aiProvider
             .ContinueConversationAsync(oldConversation, summarizePrompt, ct)
             .ConfigureAwait(false);
+
+        if (summaryResponse.Usage != null) usage += summaryResponse.Usage;
 
         string summary = (summaryResponse.Success && !string.IsNullOrWhiteSpace(summaryResponse.Text))
             ? summaryResponse.Text
@@ -483,6 +513,8 @@ public sealed partial class AgentLoop(
             .ContinueConversationAsync(newConversation, resetPrompt, latestScreenshot.Processed, ScreenMimeType, ct)
             .ConfigureAwait(false);
 
+        if (resetResponse.Usage != null) usage += resetResponse.Usage;
+
         if (!resetResponse.Success)
         {
             LogContextResetFailed(logger, resetResponse.ErrorMessage);
@@ -493,7 +525,7 @@ public sealed partial class AgentLoop(
             debugLog?.Add(new AgentDebugEntry("Context Reset — AI Response", Text: resetResponse.Text));
         }
 
-        return resetResponse.Success ? newConversation : oldConversation;
+        return (resetResponse.Success ? newConversation : oldConversation, usage);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Agent session {SessionId} started. Goal: \"{Goal}\".")]

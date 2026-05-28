@@ -73,10 +73,10 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
 
         return new GeminiGenerationConfig(
             MediaResolution: resString,
-            Temperature: temp, 
-            TopP: topP, 
-            TopK: topK, 
-            MaxOutputTokens: maxTokens, 
+            Temperature: temp,
+            TopP: topP,
+            TopK: topK,
+            MaxOutputTokens: maxTokens,
             ThinkingConfig: thinkingConfig
         );
     }
@@ -103,10 +103,10 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
     }
 
     public Task<AiResponse> SendPromptWithImageAsync(
-        string prompt, 
-        byte[] imageBytes, 
-        string mimeType = "image/png", 
-        CancellationToken cancellationToken = default, 
+        string prompt,
+        byte[] imageBytes,
+        string mimeType = "image/png",
+        CancellationToken cancellationToken = default,
         AiRequestOptions? options = null
         )
     {
@@ -139,8 +139,8 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
     }
 
     public async Task<(AiConversation Conversation, AiResponse Response)> StartConversationAsync(
-        string prompt, 
-        CancellationToken cancellationToken = default, 
+        string prompt,
+        CancellationToken cancellationToken = default,
         AiRequestOptions? options = null
         )
     {
@@ -150,7 +150,7 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
         AiChatMessage userMessage = new AiChatMessage { Role = AiChatRole.User, Text = prompt };
 
         GeminiRequest request = BuildRequest(
-            conversation: conversation, 
+            conversation: conversation,
             additionalMessage: userMessage
         );
 
@@ -166,9 +166,9 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
     }
 
     public Task<AiResponse> ContinueConversationAsync(
-        AiConversation conversation, 
-        string prompt, 
-        CancellationToken cancellationToken = default, 
+        AiConversation conversation,
+        string prompt,
+        CancellationToken cancellationToken = default,
         AiRequestOptions? options = null
         )
     {
@@ -185,10 +185,10 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
     }
 
     public Task<AiResponse> ContinueConversationAsync(
-        AiConversation conversation, 
-        byte[] imageBytes, 
+        AiConversation conversation,
+        byte[] imageBytes,
         string mimeType = "image/png",
-        CancellationToken cancellationToken = default, 
+        CancellationToken cancellationToken = default,
         AiRequestOptions? options = null
         )
     {
@@ -206,11 +206,11 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
     }
 
     public Task<AiResponse> ContinueConversationAsync(
-        AiConversation conversation, 
-        string prompt, 
-        byte[] imageBytes, 
+        AiConversation conversation,
+        string prompt,
+        byte[] imageBytes,
         string mimeType = "image/png",
-        CancellationToken cancellationToken = default, 
+        CancellationToken cancellationToken = default,
         AiRequestOptions? options = null
         )
     {
@@ -229,14 +229,14 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
     }
 
     private async Task<AiResponse> ContinueConversationCoreAsync(
-        AiConversation conversation, 
-        AiChatMessage userMessage, 
-        CancellationToken cancellationToken, 
+        AiConversation conversation,
+        AiChatMessage userMessage,
+        CancellationToken cancellationToken,
         AiRequestOptions? options = null
         )
     {
         GeminiRequest request = BuildRequest(
-            conversation: conversation, 
+            conversation: conversation,
             additionalMessage: userMessage
         );
 
@@ -252,8 +252,8 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
     }
 
     private async Task<AiResponse> SendRequestAsync(
-        GeminiRequest request, 
-        CancellationToken cancellationToken, 
+        GeminiRequest request,
+        CancellationToken cancellationToken,
         AiRequestOptions? options = null
         )
     {
@@ -329,9 +329,20 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("Received response from Gemini model {Model}.", _model);
 
+        TokenUsage? usage = null;
+        if (geminiResponse?.UsageMetadata != null)
+        {
+            usage = new TokenUsage(
+                geminiResponse.UsageMetadata.PromptTokenCount ?? 0,
+                geminiResponse.UsageMetadata.CandidatesTokenCount ?? 0,
+                geminiResponse.UsageMetadata.TotalTokenCount ?? 0
+            );
+        }
+
         return new AiResponse(
             Success: true,
-            Text: text
+            Text: text,
+            Usage: usage
         );
     }
 
@@ -368,9 +379,9 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
         if (!stripImages && message.ImageBytes is not null)
         {
             parts.Add(new GeminiPart(
-                Text: null, 
+                Text: null,
                 InlineData: new GeminiInlineData(
-                    MimeType: message.MimeType ?? "image/png", 
+                    MimeType: message.MimeType ?? "image/png",
                     Data: Convert.ToBase64String(message.ImageBytes)
                 )
             ));
@@ -393,7 +404,8 @@ public sealed class GeminiProvider(HttpClient httpClient, AppConfig appConfig, I
 
     // --- Private response DTOs ---
 
-    private record GeminiResponse(List<GeminiCandidate>? Candidates, GeminiPromptFeedback? PromptFeedback);
+    private record GeminiUsageMetadata(int? PromptTokenCount, int? CandidatesTokenCount, int? TotalTokenCount);
+    private record GeminiResponse(List<GeminiCandidate>? Candidates, GeminiPromptFeedback? PromptFeedback, GeminiUsageMetadata? UsageMetadata);
     private record GeminiCandidate(GeminiContent? Content, string? FinishReason);
     private record GeminiPromptFeedback(string? BlockReason);
 }

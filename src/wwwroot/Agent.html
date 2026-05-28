@@ -9,72 +9,73 @@
 </head>
 <body>
 
-<header>
-    <a href="/">&larr; Home</a>
-    <h1>Agent Control</h1>
-    <div style="margin-left:auto;display:flex;align-items:center;gap:14px;">
-        <span id="model-badge" style="font-size:11px;color:#4a6a8a;font-family:'Cascadia Code','Consolas',monospace;"></span>
-        <a href="/Config.html" style="font-size:12px;color:#888;text-decoration:none;border:1px solid #333;border-radius:4px;padding:4px 10px;" title="Open Configuration">⚙ Config</a>
-    </div>
-</header>
+    <header>
+        <a href="/">&larr; Home</a>
+        <h1>Agent Control</h1>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:14px;">
+            <span id="model-badge" style="font-size:11px;color:#4a6a8a;font-family:'Cascadia Code','Consolas',monospace;"></span>
+            <a href="/Config.html" style="font-size:12px;color:#888;text-decoration:none;border:1px solid #333;border-radius:4px;padding:4px 10px;" title="Open Configuration">⚙ Config</a>
+        </div>
+    </header>
 
-<div class="controls">
-    <select id="monitor-select" title="Monitor to capture"></select>
-    <input type="text" id="goal-input" placeholder="Enter a goal for the AI agent..." />
-    <button id="btn-start">Start</button>
-    <button id="btn-pause" disabled>Pause</button>
-    <button id="btn-stop" disabled>Stop</button>
-    <button id="btn-new-session" style="background:#2a2a2a;color:#888;border:1px solid #444;border-radius:6px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-left:auto;" title="Stop current session and clear output">New Session</button>
-</div>
-
-<div class="status-bar">
-    <div class="status-dot idle" id="status-dot"></div>
-    <span id="status-text">Idle</span>
-    <span id="step-counter"></span>
-    <span id="elapsed-timer"></span>
-</div>
-
-<div id="countdown-banner" style="display:none;">
-    <span>▶ Resuming in</span>
-    <span class="countdown-num" id="countdown-num">5</span>
-    <span>seconds&hellip;</span>
-    <button id="btn-skip-countdown" title="Skip countdown and execute now">Skip</button>
-</div>
-
-<div id="guidance-panel">
-    <label for="guidance-input">&#128172; Guidance</label>
-    <input type="text" id="guidance-input" placeholder="Send a mid-session instruction to the AI&hellip;" />
-    <label class="guidance-cancel-wrap" title="Cancel the next pending action and redirect the AI with your guidance">
-        <input type="checkbox" id="guidance-cancel" />
-        <span>Cancel next action</span>
-    </label>
-    <button id="btn-guidance">Send</button>
-    <span class="guidance-ack" id="guidance-ack">&#10003; Queued</span>
-</div>
-
-<div class="prompt-banner" id="prompt-banner" style="display:none;">
-    <details id="prompt-details">
-        <summary>Goal&nbsp;<span class="prompt-preview" id="prompt-preview"></span></summary>
-        <div class="prompt-full" id="prompt-full"></div>
-    </details>
-</div>
-
-<main>
-    <div class="final-result" id="final-result"><span class="final-result-msg" id="final-result-msg"></span><span class="final-result-time" id="final-result-time"></span></div>
-
-    <div class="current-step" id="current-step">
-        <h2>Current Step</h2>
-        <div class="thought" id="current-thought">Waiting for agent to start...</div>
-        <div class="action" id="current-action" style="display:none;"></div>
-        <div class="result" id="current-result"></div>
-        <div class="live-substeps" id="live-substeps"></div>
+    <div class="controls">
+        <select id="monitor-select" title="Monitor to capture"></select>
+        <input type="text" id="goal-input" placeholder="Enter a goal for the AI agent..." />
+        <button id="btn-start">Start</button>
+        <button id="btn-pause" disabled>Pause</button>
+        <button id="btn-stop" disabled>Stop</button>
+        <button id="btn-new-session" style="background:#2a2a2a;color:#888;border:1px solid #444;border-radius:6px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-left:auto;" title="Stop current session and clear output">New Session</button>
     </div>
 
-    <div class="step-log-header"><span>Step History</span><button id="btn-copy-steps" title="Copy all steps as JSON">Copy</button></div>
-    <div class="step-log" id="step-log"></div>
-</main>
+    <div class="status-bar">
+        <div class="status-dot idle" id="status-dot"></div>
+        <span id="status-text">Idle</span>
+        <span id="step-counter"></span>
+        <span id="token-counter"></span>
+        <span id="elapsed-timer"></span>
+    </div>
 
-<script type="module" src="/js/agent.js"></script>
+    <div id="countdown-banner" style="display:none;">
+        <span>▶ Resuming in</span>
+        <span class="countdown-num" id="countdown-num">5</span>
+        <span>seconds&hellip;</span>
+        <button id="btn-skip-countdown" title="Skip countdown and execute now">Skip</button>
+    </div>
+
+    <div id="guidance-panel">
+        <label for="guidance-input">&#128172; Guidance</label>
+        <input type="text" id="guidance-input" placeholder="Send a mid-session instruction to the AI&hellip;" />
+        <label class="guidance-cancel-wrap" title="Cancel the next pending action and redirect the AI with your guidance">
+            <input type="checkbox" id="guidance-cancel" />
+            <span>Cancel next action</span>
+        </label>
+        <button id="btn-guidance">Send</button>
+        <span class="guidance-ack" id="guidance-ack">&#10003; Queued</span>
+    </div>
+
+    <div class="prompt-banner" id="prompt-banner" style="display:none;">
+        <details id="prompt-details">
+            <summary>Goal&nbsp;<span class="prompt-preview" id="prompt-preview"></span></summary>
+            <div class="prompt-full" id="prompt-full"></div>
+        </details>
+    </div>
+
+    <main>
+        <div class="final-result" id="final-result"><span class="final-result-msg" id="final-result-msg"></span><span class="final-result-time" id="final-result-time"></span></div>
+
+        <div class="current-step" id="current-step">
+            <h2>Current Step</h2>
+            <div class="thought" id="current-thought">Waiting for agent to start...</div>
+            <div class="action" id="current-action" style="display:none;"></div>
+            <div class="result" id="current-result"></div>
+            <div class="live-substeps" id="live-substeps"></div>
+        </div>
+
+        <div class="step-log-header"><span>Step History</span><button id="btn-copy-steps" title="Copy all steps as JSON">Copy</button></div>
+        <div class="step-log" id="step-log"></div>
+    </main>
+
+    <script type="module" src="/js/agent.js"></script>
 
 </body>
 </html>
