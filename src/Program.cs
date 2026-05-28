@@ -14,12 +14,12 @@ using Thio_Universal_Agent.OS_Windows;
 const string appMutexName = "ThioUniversalAgent_SingleInstance_Mutex";
 const string pipeName = "ThioUniversalAgent_URL_Pipe";
 
-// 1. Mutex check to see if we are the second instance
+// Mutex check to see if we are the second instance
 using Mutex mutex = new Mutex(true, appMutexName, out bool createdNew);
 
 if (!createdNew)
 {
-    // 2. We are the second instance. Connect to the pipe, get the URL, and exit.
+    // We are the second instance. Connect to the pipe, get the URL, and exit.
     try
     {
         using NamedPipeClientStream client = new NamedPipeClientStream(".", pipeName, PipeDirection.In);
@@ -41,7 +41,8 @@ if (!createdNew)
 // --------------------------------------
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-int availablePort = RuntimeHandlers.FindAvailablePort();
+// Use port from args if given, otherwise finds available port
+int availablePort = builder.Configuration.GetValue<int?>("port") ?? RuntimeHandlers.FindAvailablePort(); 
 builder.WebHost.UseUrls($"http://localhost:{availablePort}");
 
 // 3. Register our managed IPC server to run in the background
