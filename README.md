@@ -171,7 +171,7 @@ This application executes real, unauthenticated OS-level input events. Do not ex
 # Setup & Usage Instructions
 
 ### How to Download
-1.  Go to the [Releases](https://github.com/guestsmotog04/Ondrej-Universal-Agent/releases) page.
+1.  Go to the [Releases](https://github.com/guestsmotog04/Ondrej-Universal-Agent/tags) page.
 2.  For the latest release, look under `Assets` and download `Ondrej-Universal-Agent.exe`.
 
 ### Usage Instructions
