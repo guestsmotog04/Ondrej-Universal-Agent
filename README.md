@@ -64,7 +64,7 @@ Example of it queuing multiple actions at once, while accurately clicking exact 
 
 # How It's _Built Different_
 
-* **Single Portable `Exe` - NO Installation Required** - Releases are compiled with single-exe mode, it's just one file.
+* **Single Portable `EXE` - NO Installation Required** - Releases are compiled with single-exe mode, it's just one file.
    * _No_ bloated 🤡Python🤡 or 🤡NodeJS🤡 or other environment installation.
    * _ZERO_ Third-Party Dependencies 😤 (Uses core .NET Libraries and official Microsoft packages only) _#AllMyHomiesHateDependencies_
    * Ideal for running in VMs and Sandboxes. Spin up a fresh sandbox instance and it's ready to go, just set the API key.
