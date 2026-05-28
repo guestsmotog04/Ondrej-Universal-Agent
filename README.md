@@ -21,10 +21,37 @@ Example of it queuing multiple actions at once, while accurately identifying exa
 <b>Prompt:</b> <i>In MS Paint draw a self portrait with multiple colors with the brush tool. Use the full action queue when possible.</i><br/>
 <b>Model:</b> Gemini 3.5 Flash
 </p>
-  
+
+# Example Uses
+
+- Ask it to _show_ you how to do something instead of just getting a text description like other AIs.
+- Ask it to troubleshoot some error you're getting and figure out the cause.
+- Ask it to visually find an image in a folder of un-labelled files, based on a description.
+- Tell it to check every 10 seconds if a video render is done, then when it is, copy the file somewhere.
+    - (Though not recommended to leave unattended, unless in a controlled sandbox environment)
+
+
+## Frequently Asked Questions
+
+### **Q:** Is this like OpenClaw or Hermes?
+**A:** No, this is not intended to be a 24/7 running agent. It's meant for individual tasks you'd that you'd normally do yourself. Give it a "goal", sit back, and it will start moving the mouse, clicking, typing, etc. just like you would.
+
+### **Q:** How long _can_ it run?
+**A:** There's not actually a limit. You can set the max number of steps to any number in the settings. The default is arbitrarily set to 100 steps.
+
+### **Q:** Which AI Services are supported?
+**A:** Currently  ChatGPT, Gemini, and Claude. Your own API key is required. Currently it seems Gemini works the best, especially `gemini-flash-latest`
+
+### **Q:** Doesn't this use a ton of tokens?
+**A:** Sort of, but not as much as you might think. Each step is maybe 3k tokens, but input tokens are cheaper. Completion tokens are usually as few as 50, up to a few hundred for many queued actions. The big factor is how many thinking tokens are used.
+  - For example, with Gemini 3.5 Flash, it seems each step with a single action costs about 1 cent or less.
+  - I recommend setting thinking to the minimum, but even then it may use a few thousand tokens if it's going to queue up a lot of actions.
+  - There's also context mitigation logic, such as summarization context every X steps, and removing past images from the context window (Both can be disabled in settings)
+
+
 --------
 
-## How It's _Built Different_
+# How It's _Built Different_
 
 * **Single Portable `Exe` - NO Installation Required** - Releases are compiled with single-exe mode, it's just one file.
    * _No_ bloated 🤡Python🤡 or 🤡NodeJS🤡 or other environment installation.
@@ -41,7 +68,7 @@ Example of it queuing multiple actions at once, while accurately identifying exa
 
 --------
 
-# Comparison To Similar Tools
+# Comparison With Computer-Use Tools
 
 <table>
   <thead>
