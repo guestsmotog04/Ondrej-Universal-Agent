@@ -85,7 +85,7 @@ Example of it queuing multiple actions at once, while accurately clicking exact 
   <thead>
     <tr>
       <th align="left">Feature</th>
-      <th align="center">Thio's Universal Agent</th>
+      <th align="center"><strike>Thio's</strike> Ondrej's Universal Agent</th>
       <th align="center">OpenAI Operator</th>
       <th align="center">Google Gemini Computer Use</th>
       <th align="center">Anthropic Computer Use</th>
