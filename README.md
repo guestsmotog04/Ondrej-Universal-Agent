@@ -205,14 +205,12 @@ Note: You'll need to add your own API key for your AI of choice. I'll add local 
 2. Select your desired build configuration (`Debug` or `Release`).
 3. Compile and run the solution.
 
-# Licensing - Personal Use Only
+<strike>\# Licensing - Personal Use Only
 
 This app is source-available. Free for PERSONAL use only. You may not use it for commercial purposes (it's not ready for production anyway).
 
-**Are you a big tech company who wants to buy it and/or bring me on to build it out properly? I could be convinced.**
+\*\*Are you a big tech company who wants to buy it and/or bring me on to build it out properly? I could be convinced.\*\*</strike>
 
-<p align="center">
-<img width="450" src="https://github.com/user-attachments/assets/c6a61205-ba4e-4a7a-b85a-1328a1dec761" />
-</p>
-
+# License
+[MIT license](https://github.com/guestsmotog04/Ondrej-Universal-Agent/blob/master/LICENSE.md)
 
