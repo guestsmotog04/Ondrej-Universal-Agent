@@ -18,4 +18,13 @@ public interface IAiProviderConfig
 
     /// <summary>Model identifier. May be updated at runtime via the web UI.</summary>
     string Model { get; set; }
+
+    /// <summary>Cost per 1 million input (prompt) tokens. <see langword="null"/> when not configured.</summary>
+    double? InputPricePerMillionTokens { get; set; }
+
+    /// <summary>Cost per 1 million output (completion) tokens. <see langword="null"/> when not configured.</summary>
+    double? OutputPricePerMillionTokens { get; set; }
+
+    /// <summary>Cost per 1 million cached input tokens. <see langword="null"/> when not applicable or not configured.</summary>
+    double? CachedInputPricePerMillionTokens { get; set; }
 }

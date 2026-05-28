@@ -2,6 +2,7 @@
 // ── Type definitions ──────────────────────────────────────────────────────
 
 /** @typedef {{ promptTokens: number, completionTokens: number, totalTokens: number, thinkingTokens?: number }} TokenUsage */
+/** @typedef {{ inputPricePerMillionTokens?: number|null, outputPricePerMillionTokens?: number|null, cachedInputPricePerMillionTokens?: number|null }} ProviderPricing */
 /** @typedef {{ aiResponseMs: number, parseMs: number, executionMs: number, coordResolutionMs?: number }} StepTimings */
 /** @typedef {{ label: string, text?: string, imageBase64?: string }} DebugLogEntry */
 /** @typedef {{ action: string, result: string, durationMs: number, success: boolean, debugLog?: DebugLogEntry[], usage?: TokenUsage }} QueuedSubStep */
@@ -32,6 +33,7 @@ const statusDot       = /** @type {HTMLDivElement} */     (document.getElementBy
 const statusText      = /** @type {HTMLSpanElement} */    (document.getElementById('status-text'));
 const stepCounter     = /** @type {HTMLSpanElement} */    (document.getElementById('step-counter'));
 const tokenCounter    = /** @type {HTMLSpanElement} */    (document.getElementById('token-counter'));
+const costCounter     = /** @type {HTMLSpanElement} */    (document.getElementById('cost-counter'));
 const finalResultEl   = /** @type {HTMLDivElement} */     (document.getElementById('final-result'));
 const finalResultMsg  = /** @type {HTMLSpanElement} */    (document.getElementById('final-result-msg'));
 const finalResultTime = /** @type {HTMLSpanElement} */    (document.getElementById('final-result-time'));
@@ -87,6 +89,10 @@ let isPaused = false;
 let sessionStartTime = null;
 /** @type {ReturnType<typeof setInterval> | undefined} */
 let elapsedIntervalId;
+/** @type {ProviderPricing} */
+let activePricing = {};
+/** Running total cost in dollars for the current session */
+let sessionTotalCost = 0;
 
 // ── Boot: fetch server config + try to resume a stored session ──────────
 (async () => {
@@ -108,6 +114,7 @@ let elapsedIntervalId;
             else if (activeProv === 'Gemini') model = storedCfg?.gemini?.model || cfg.gemini?.model;
 
             if (model) modelBadge.textContent = model;
+            loadPricingFromConfig(cfg, storedCfg, activeProv);
         }
 
         if (dbgRes.ok) {
@@ -299,6 +306,8 @@ async function startAgent() {
     liveSubsteps.innerHTML = '';
     stepCounter.textContent = '';
     updateTokenCounter(0);
+    sessionTotalCost = 0;
+    updateCostCounter(0);
     setStatus('running', debugEnabled ? 'Running (Debug Mode)' : 'Running');
 
     btnStart.disabled = true;
@@ -419,6 +428,8 @@ async function newSession() {
     liveSubsteps.innerHTML = '';
     stepCounter.textContent = '';
     updateTokenCounter(0);
+    sessionTotalCost = 0;
+    updateCostCounter(0);
     goalInput.value = '';
     setStatus('idle', debugEnabled ? 'Idle (Debug Mode)' : 'Idle');
     resetControls();
@@ -587,6 +598,13 @@ function handleStep(msg) {
     if (msg.totalTokensUsed != null) {
         updateTokenCounter(msg.totalTokensUsed);
     }
+    if (msg.usage) {
+        const stepCost = computeStepCost(msg.usage);
+        if (stepCost != null) {
+            sessionTotalCost += stepCost;
+            updateCostCounter(sessionTotalCost);
+        }
+    }
 
     liveSubsteps.innerHTML = '';
 
@@ -624,7 +642,9 @@ function handleStep(msg) {
 
     if (msg.usage && msg.usage.totalTokens > 0) {
         const thinkingPart = msg.usage.thinkingTokens != null ? `, ${msg.usage.thinkingTokens.toLocaleString()} thinking` : '';
-        html += `<div class="step-tokens" style="font-size:0.85em;color:#888;margin-top:4px;">Tokens: ${msg.usage.totalTokens.toLocaleString()} (${msg.usage.promptTokens.toLocaleString()} prompt, ${msg.usage.completionTokens.toLocaleString()} completion${thinkingPart})</div>`;
+        const stepCost = computeStepCost(msg.usage);
+        const costPart = stepCost != null ? ` — <span style="color:#8a8" title="Estimated cost for this step">~$${stepCost.toFixed(6)}</span>` : '';
+        html += `<div class="step-tokens" style="font-size:0.85em;color:#888;margin-top:4px;">Tokens: ${msg.usage.totalTokens.toLocaleString()} (${msg.usage.promptTokens.toLocaleString()} prompt, ${msg.usage.completionTokens.toLocaleString()} completion${thinkingPart})${costPart}</div>`;
     }
 
     // Nested expandable queue sub-steps
@@ -872,6 +892,60 @@ function updateTokenCounter(tokens) {
     } else {
         tokenCounter.textContent = '';
     }
+}
+
+/**
+ * @param {number} totalCost
+ */
+function updateCostCounter(totalCost) {
+    if (!costCounter) return;
+    if (totalCost > 0) {
+        costCounter.textContent = ` | Est. Cost: ~$${totalCost.toFixed(4)}`;
+        costCounter.style.marginLeft = '10px';
+        costCounter.style.color = '#6ab06a';
+        costCounter.style.fontFamily = "'Cascadia Code', 'Consolas', monospace";
+        costCounter.style.fontWeight = '600';
+    } else {
+        costCounter.textContent = '';
+    }
+}
+
+/**
+ * Returns the estimated cost (in USD) for a single step given its token usage,
+ * or null if no pricing is configured.
+ * @param {TokenUsage} usage
+ * @returns {number|null}
+ */
+function computeStepCost(usage) {
+    const inPrice  = activePricing.inputPricePerMillionTokens;
+    const outPrice = activePricing.outputPricePerMillionTokens;
+    if (inPrice == null && outPrice == null) return null;
+    const inputCost  = ((inPrice  ?? 0) * usage.promptTokens) / 1_000_000;
+    // Thinking tokens are billed as output tokens
+    const outputTokens = usage.completionTokens + (usage.thinkingTokens ?? 0);
+    const outputCost = ((outPrice ?? 0) * outputTokens) / 1_000_000;
+    return inputCost + outputCost;
+}
+
+/**
+ * Reads pricing for the active provider from the flat /api/config response and
+ * any locally-stored overrides, and writes the result into `activePricing`.
+ * @param {Record<string, any>} serverCfg  - parsed /api/config JSON
+ * @param {Record<string, any>} storedCfg  - localStorage config overrides
+ * @param {string|null} activeProv
+ */
+function loadPricingFromConfig(serverCfg, storedCfg, activeProv) {
+    /** @param {string} section @returns {Record<string, any>} */
+    const merged = (section) => ({ ...(serverCfg[section] ?? {}), ...(storedCfg?.[section] ?? {}) });
+    let provSection;
+    if (activeProv === 'ChatGPT')   provSection = merged('openAI') ?? merged('openai');
+    else if (activeProv === 'Claude') provSection = merged('anthropic');
+    else                              provSection = merged('gemini');
+    activePricing = {
+        inputPricePerMillionTokens:       provSection?.inputPricePerMillionTokens  ?? null,
+        outputPricePerMillionTokens:      provSection?.outputPricePerMillionTokens ?? null,
+        cachedInputPricePerMillionTokens: provSection?.cachedInputPricePerMillionTokens ?? null,
+    };
 }
 
 /**

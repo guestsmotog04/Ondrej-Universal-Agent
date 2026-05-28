@@ -44,17 +44,26 @@ internal static class ConfigEndpoints
                     TopK:                      appConfig.Gemini.TopK,
                     CoordinateMaxOutputTokens: appConfig.Gemini.CoordinateMaxOutputTokens,
                     ThinkingBudget:            appConfig.Gemini.ThinkingBudget,
-                    ThinkingLevel:             appConfig.Gemini.ThinkingLevel?.ToString()
+                    ThinkingLevel:             appConfig.Gemini.ThinkingLevel?.ToString(),
+                    InputPricePerMillionTokens:        appConfig.Gemini.InputPricePerMillionTokens,
+                    OutputPricePerMillionTokens:       appConfig.Gemini.OutputPricePerMillionTokens,
+                    CachedInputPricePerMillionTokens:  appConfig.Gemini.CachedInputPricePerMillionTokens
                 ),
                 OpenAI: new OpenAIConfigDto(
                     Model:           appConfig.OpenAI.Model,
                     Temperature:     appConfig.OpenAI.Temperature,
-                    MaxOutputTokens: appConfig.OpenAI.MaxOutputTokens
+                    MaxOutputTokens: appConfig.OpenAI.MaxOutputTokens,
+                    InputPricePerMillionTokens:        appConfig.OpenAI.InputPricePerMillionTokens,
+                    OutputPricePerMillionTokens:       appConfig.OpenAI.OutputPricePerMillionTokens,
+                    CachedInputPricePerMillionTokens:  appConfig.OpenAI.CachedInputPricePerMillionTokens
                 ),
                 Anthropic: new AnthropicConfigDto(
                     Model:           appConfig.Anthropic.Model,
                     Temperature:     appConfig.Anthropic.Temperature,
-                    MaxOutputTokens: appConfig.Anthropic.MaxOutputTokens
+                    MaxOutputTokens: appConfig.Anthropic.MaxOutputTokens,
+                    InputPricePerMillionTokens:        appConfig.Anthropic.InputPricePerMillionTokens,
+                    OutputPricePerMillionTokens:       appConfig.Anthropic.OutputPricePerMillionTokens,
+                    CachedInputPricePerMillionTokens:  appConfig.Anthropic.CachedInputPricePerMillionTokens
                 ),
                 Hotkeys: new HotkeyConfigDto(
                     Enabled:            appConfig.Hotkeys.Enabled,
@@ -234,7 +243,10 @@ internal sealed record GeminiConfigDto(
     int? TopK,
     int? CoordinateMaxOutputTokens,
     int? ThinkingBudget,
-    string? ThinkingLevel
+    string? ThinkingLevel,
+    double? InputPricePerMillionTokens,
+    double? OutputPricePerMillionTokens,
+    double? CachedInputPricePerMillionTokens
 );
 
 internal sealed record HotkeyConfigDto(
@@ -246,11 +258,17 @@ internal sealed record HotkeyConfigDto(
 internal sealed record OpenAIConfigDto(
     string? Model,
     double? Temperature,
-    int? MaxOutputTokens
+    int? MaxOutputTokens,
+    double? InputPricePerMillionTokens,
+    double? OutputPricePerMillionTokens,
+    double? CachedInputPricePerMillionTokens
 );
 
 internal sealed record AnthropicConfigDto(
     string? Model,
     double? Temperature,
-    int? MaxOutputTokens
+    int? MaxOutputTokens,
+    double? InputPricePerMillionTokens,
+    double? OutputPricePerMillionTokens,
+    double? CachedInputPricePerMillionTokens
 );

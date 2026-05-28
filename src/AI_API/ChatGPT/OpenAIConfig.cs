@@ -18,6 +18,15 @@ public class OpenAIConfig : IAiProviderConfig
     [ConfigField("Max Output Tokens", Description = "Maximum token count for the main model response")]
     public int? MaxOutputTokens { get; set; }
 
+    [ConfigField("Input Price ($ / 1M tokens)", Description = "Cost per 1 million input (prompt) tokens for the selected model")]
+    public double? InputPricePerMillionTokens { get; set; }
+
+    [ConfigField("Output Price ($ / 1M tokens)", Description = "Cost per 1 million output (completion) tokens for the selected model")]
+    public double? OutputPricePerMillionTokens { get; set; }
+
+    [ConfigField("Cached Input Price ($ / 1M tokens)", Description = "Cost per 1 million cached input tokens, if the model supports prompt caching (leave blank if unused)")]
+    public double? CachedInputPricePerMillionTokens { get; set; }
+
     public OpenAIConfig() { }
 
     public OpenAIConfig(IConfigurationSection section)

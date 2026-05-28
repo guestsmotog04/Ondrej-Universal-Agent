@@ -39,6 +39,15 @@ public class GeminiConfig : IAiProviderConfig
     [ConfigField("Thinking Level", Description = "Pre-set thinking intensity (Gemini 3.x models)")]
     public GeminiThinkingLevel? ThinkingLevel { get; set; }
 
+    [ConfigField("Input Price ($ / 1M tokens)", Description = "Cost per 1 million input (prompt) tokens for the selected model")]
+    public double? InputPricePerMillionTokens { get; set; }
+
+    [ConfigField("Output Price ($ / 1M tokens)", Description = "Cost per 1 million output (completion) tokens for the selected model")]
+    public double? OutputPricePerMillionTokens { get; set; }
+
+    [ConfigField("Cached Input Price ($ / 1M tokens)", Description = "Cost per 1 million cached input tokens, if the model supports prompt caching (leave blank if unused)")]
+    public double? CachedInputPricePerMillionTokens { get; set; }
+
     // ── Constructors ──────────────────────────────────────────────────────────
 
     /// <summary>Creates a <see cref="GeminiConfig"/> with all default values.</summary>
