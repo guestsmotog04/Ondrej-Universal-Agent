@@ -212,5 +212,4 @@ This app is source-available. Free for PERSONAL use only. You may not use it for
 \*\*Are you a big tech company who wants to buy it and/or bring me on to build it out properly? I could be convinced.\*\*</strike>
 
 # License
-[MIT license](https://github.com/guestsmotog04/Ondrej-Universal-Agent/blob/master/LICENSE.md)
-
+[MIT license](https://github.com/guestsmotog04/Ondrej-Universal-Agent?tab=MIT-1-ov-file)
